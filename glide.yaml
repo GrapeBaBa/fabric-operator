@@ -1,0 +1,5 @@
+package: github.com/grapebaba/fabric-operator
+import:
+- package: k8s.io/client-go
+  version: v2.0.0
+- package: golang.org/x/net

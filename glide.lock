@@ -1,0 +1,8 @@
+hash: d1c88c08fd863769656acf0532b8835be50f5ba8148ccea489e3bcd9410ccada
+updated: 2017-03-07T12:57:22.19690716+08:00
+imports:
+- name: golang.org/x/net
+  version: e90d6d0afc4c315a0d87a568ae68577cc15149a0
+- name: k8s.io/client-go
+  version: e121606b0d09b2e1c467183ee46217fa85a6b672
+testImports: []
