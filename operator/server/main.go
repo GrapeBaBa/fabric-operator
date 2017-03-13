@@ -76,7 +76,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	logrus.Infof("etcd-operator Version: %v", version.Version)
+	logrus.Infof("fabric-operator Version: %v", version.Version)
 	logrus.Infof("Git SHA: %s", version.GitSHA)
 	logrus.Infof("Go Version: %s", runtime.Version())
 	logrus.Infof("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH)
@@ -91,7 +91,7 @@ func main() {
 	rl := &resourcelock.EndpointsLock{
 		EndpointsMeta: api.ObjectMeta{
 			Namespace: namespace,
-			Name:      "etcd-operator",
+			Name:      "fabric-operator",
 		},
 		Client: k8sutil.MustNewKubeClient(),
 		LockConfig: resourcelock.ResourceLockConfig{

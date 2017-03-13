@@ -2,11 +2,16 @@ package controller
 
 import (
 	"errors"
-	"time"
-	"net/http"
-	"k8s.io/client-go/kubernetes"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/Sirupsen/logrus"
+	"github.com/grapebaba/fabric-operator/spec"
+	"github.com/grapebaba/fabric-operator/util/k8sutil"
+	v1beta1extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 var (
@@ -107,4 +112,72 @@ func (c *Controller) Run() error {
 	//	}
 	//}()
 	//return <-errCh
+}
+
+func (c *Controller) initResource() (string, error) {
+	watchVersion := "0"
+	err := c.createTPR()
+	if err != nil {
+		if k8sutil.IsKubernetesResourceAlreadyExistError(err) {
+			// TPR has been initialized before. We need to recover existing cluster.
+			watchVersion, err = c.findAllChains()
+			if err != nil {
+				return "", err
+			}
+		} else {
+			return "", fmt.Errorf("fail to create TPR: %v", err)
+		}
+	}
+	err = k8sutil.CreateStorageClass(c.KubeCli, c.PVProvisioner)
+	if err != nil {
+		if !k8sutil.IsKubernetesResourceAlreadyExistError(err) {
+			return "", fmt.Errorf("fail to create storage class: %v", err)
+		}
+	}
+	return watchVersion, nil
+}
+
+func (c *Controller) createTPR() error {
+	tpr := &v1beta1extensions.ThirdPartyResource{
+		ObjectMeta: v1.ObjectMeta{
+			Name: spec.TPRName(),
+		},
+		Versions: []v1beta1extensions.APIVersion{
+			{Name: spec.TPRVersion},
+		},
+		Description: spec.TPRDescription,
+	}
+	_, err := c.KubeCli.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
+	if err != nil {
+		return err
+	}
+
+	return k8sutil.WaitChainTPRReady(c.KubeCli.CoreV1().RESTClient(), 3*time.Second, 30*time.Second, c.Namespace)
+}
+
+func (c *Controller) findAllChains() (string, error) {
+	c.logger.Info("finding existing chains...")
+	chainList, err := k8sutil.GetChainList(c.Config.KubeCli.CoreV1().RESTClient(), c.Config.Namespace)
+	if err != nil {
+		return "", err
+	}
+
+	for i := range chainList.Items {
+		chain := chainList.Items[i]
+
+		if chain.Status.IsFailed() {
+			c.logger.Infof("ignore failed chain (%s). Please delete its TPR", chain.Metadata.Name)
+			continue
+		}
+
+		chain.Spec.Cleanup()
+
+		stopC := make(chan struct{})
+		nc := cluster.New(c.makeClusterConfig(), &chain, stopC, &c.waitCluster)
+		c.stopChMap[chain.Metadata.Name] = stopC
+		c.clusters[chain.Metadata.Name] = nc
+		c.clusterRVs[chain.Metadata.Name] = chain.Metadata.ResourceVersion
+	}
+
+	return chainList.Metadata.ResourceVersion, nil
 }

@@ -6,6 +6,7 @@ import (
 
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
+	"strings"
 )
 
 const (
@@ -28,7 +29,6 @@ type Chain struct {
 	Spec     ChainSpec   `json:"spec"`
 	Status   ChainStatus `json:"status"`
 }
-
 
 type ClusterSpec struct {
 	// Size is the expected size of the fabric component cluster.
@@ -161,4 +161,29 @@ type ClusterStatus struct {
 	// BackupServiceStatus only exists when backup is enabled in the
 	// cluster spec.
 	//BackupServiceStatus *BackupServiceStatus `json:"backupServiceStatus,omitempty"`
+}
+
+func (cs *ChainStatus) IsFailed() bool {
+	if cs == nil {
+		return false
+	}
+
+	if cs.PeerStatus.Phase == ClusterPhaseFailed {
+		return true
+	}
+
+	if cs.OrdererStatus.Phase == ClusterPhaseFailed {
+		return true
+	}
+
+	return false
+}
+
+// Cleanup cleans up user passed spec, e.g. defaulting, transforming fields.
+// TODO: move this to admission controller
+func (c *ChainSpec) Cleanup() {
+	if len(c.Version) == 0 {
+		c.Version = defaultVersion
+	}
+	c.Version = strings.TrimLeft(c.Version, "v")
 }
