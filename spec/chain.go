@@ -2,11 +2,11 @@ package spec
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
-	"strings"
 )
 
 const (
@@ -16,7 +16,7 @@ const (
 	TPRKindPlural  = "chains"
 	TPRGroup       = "chain.grapebaba.me"
 	TPRVersion     = "v1beta1"
-	TPRDescription = "Managed hyperledger fabric blockchain"
+	TPRDescription = "Managed hyperledger fabric"
 )
 
 func TPRName() string {
@@ -28,16 +28,6 @@ type Chain struct {
 	Metadata v1.ObjectMeta `json:"metadata,omitempty"`
 	Spec     ChainSpec   `json:"spec"`
 	Status   ChainStatus `json:"status"`
-}
-
-type ClusterSpec struct {
-	// Size is the expected size of the fabric component cluster.
-	// The fabric-operator will eventually make the size of the running
-	// orderers equal to the expected size.
-	Size int `json:"size"`
-
-	// Pod defines the policy to create pod for the container.
-	Pod *PodPolicy `json:"pod,omitempty"`
 }
 
 type ChainSpec struct {
@@ -55,28 +45,58 @@ type ChainSpec struct {
 	Paused bool `json:"paused,omitempty"`
 
 	// Pod defines the policy to create pod for the container.
+	// This will be overridden by sub spec (e.g OrganizationSpec, AuthoritySpec)
 	Pod *PodPolicy `json:"pod,omitempty"`
 
-	// PeerSpec defines the spec to create the fabric peers.
-	PeerSpec *ClusterSpec `json:"peer_spec"`
+	// OrganizationsSpec defines the spec to create fabric organizations.
+	OrganizationsSpec OrganizationsSpec `json:"organizations_spec"`
 
-	// OrdererSpec defines the spec to create the fabric orderers.
-	OrdererSpec *ClusterSpec `json:"orderer_spec"`
+	// AuthoritiesSpec defines the spec to create the fabric cas.
+	AuthoritiesSpec AuthoritiesSpec `json:"authorities_spec"`
+}
 
-	// CASpec defines the spec to create the fabric ca.
-	CASpec *ClusterSpec `json:"ca_spec"`
-	// Backup defines the policy to backup data of etcd cluster if not nil.
-	// If backup policy is set but restore policy not, and if a previous backup exists,
-	// this cluster would face conflict and fail to start.
-	//Backup *BackupPolicy `json:"backup,omitempty"`
+type ChainStatus struct {
+	// CurrentVersion is the current cluster version
+	CurrentVersion string `json:"currentVersion"`
+	// TargetVersion is the version the cluster upgrading to.
+	// If the cluster is not upgrading, TargetVersion is empty.
+	TargetVersion string `json:"targetVersion"`
 
-	// Restore defines the policy to restore cluster form existing backup if not nil.
-	// It's not allowed if restore policy is set and backup policy not.
-	//Restore *RestorePolicy `json:"restore,omitempty"`
+	OrgnazationsStatus OrgnazationStatus `json:"orgnazation_status"`
 
-	// SelfHosted determines if the etcd cluster is used for a self-hosted
-	// Kubernetes cluster.
-	//SelfHosted *SelfHostedPolicy `json:"selfHosted,omitempty"`
+	AuthoritiesStatus AuthoritiesStatus `json:"authorities_status"`
+}
+
+type OrganizationsSpec struct {
+	// OrganizationsSpec defines the spec to create fabric organizations.
+	Organizations []OrganizationSpec `json:"organizations"`
+}
+
+type OrganizationSpec struct {
+	// PeersSpec defines the spec to create fabric peers.
+	PeersSpec *ClusterSpec `json:"peers_spec"`
+
+	// OrderersSpec defines the spec to create fabric orderers.
+	OrderersSpec *ClusterSpec `json:"orderers_spec"`
+}
+
+type AuthoritiesSpec struct {
+	// AuthoritiesSpec defines the spec to create the fabric cas.
+	Authorities []AuthoritySpec `json:"authorities"`
+}
+
+type AuthoritySpec struct {
+	ClusterSpec
+}
+
+type ClusterSpec struct {
+	// Size is the expected size of the fabric component cluster.
+	// The fabric-operator will eventually make the size of the running
+	// members equal to the expected size.
+	Size int `json:"size"`
+
+	// Pod defines the policy to create pod for the container.
+	Pod *PodPolicy `json:"pod,omitempty"`
 }
 
 // PodPolicy defines the policy to create pod for the fabric container.
@@ -127,21 +147,34 @@ const (
 	ClusterConditionUpgrading = "Upgrading"
 )
 
-type ChainStatus struct {
-	PeerStatus *ClusterStatus `json:"peer_status"`
+type OrgnazationsStatus struct {
+	// All organizations status in the chain
+	Orgnazations []OrgnazationStatus `json:"orgnazations"`
+}
 
-	OrdererStatus *ClusterStatus `json:"orderer_status"`
+type AuthoritiesStatus struct {
+	// All authorities status in the chain
+	Authorities []AuthorityStatus `json:"orgnazations"`
+}
 
-	// CurrentVersion is the current cluster version
-	CurrentVersion string `json:"currentVersion"`
-	// TargetVersion is the version the cluster upgrading to.
-	// If the cluster is not upgrading, TargetVersion is empty.
-	TargetVersion string `json:"targetVersion"`
+type OrgnazationStatus struct {
+	// Peer cluster status of this organization
+	Peers ClusterStatus `json:"peers"`
+
+	// Orderer cluster status of this organization
+	Orderers ClusterStatus `json:"orderers"`
+}
+
+type AuthorityStatus struct {
+	// CA cluster status of this authority
+	CAs ClusterStatus `json:"peers"`
 }
 
 type ClusterStatus struct {
 	// Phase is the cluster running phase
-	Phase  ClusterPhase `json:"phase"`
+	Phase ClusterPhase `json:"phase"`
+
+	// Reason for status
 	Reason string       `json:"reason"`
 
 	// ControlPuased indicates the operator pauses the control of the cluster.
@@ -152,31 +185,18 @@ type ClusterStatus struct {
 
 	// Size is the current size of the cluster
 	Size int `json:"size"`
-	// ReadyPods are the etcd pods that are ready to serve requests
-	ReadyPods []string `json:"readyPods"`
-	// UnreadyPods are the etcd pods not ready to serve requests
-	UnreadyPods []string `json:"unreadyPods"`
 
-	// BackupServiceStatus is the status of the backup service.
-	// BackupServiceStatus only exists when backup is enabled in the
-	// cluster spec.
-	//BackupServiceStatus *BackupServiceStatus `json:"backupServiceStatus,omitempty"`
+	// Members are the  members in the cluster
+	Members MembersStatus `json:"members"`
 }
 
-func (cs *ChainStatus) IsFailed() bool {
-	if cs == nil {
-		return false
-	}
+type MembersStatus struct {
+	// Ready are the peer/orderer members that are ready to serve requests
+	// The member names are the same as the peer/orderer pod names
+	Ready []string `json:"ready,omitempty"`
 
-	if cs.PeerStatus.Phase == ClusterPhaseFailed {
-		return true
-	}
-
-	if cs.OrdererStatus.Phase == ClusterPhaseFailed {
-		return true
-	}
-
-	return false
+	// Unready are the peer/orderer members not ready to serve requests
+	Unready []string `json:"unready,omitempty"`
 }
 
 // Cleanup cleans up user passed spec, e.g. defaulting, transforming fields.

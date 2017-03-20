@@ -1,0 +1,15 @@
+apiVersion: "chain.grapebaba.me/v1beta1"
+kind: "Chain"
+metadata:
+  name: "example-etcd-cluster"
+spec:
+  version: "1.0.0-alpha"
+  organizations:
+    - org0:
+        ordererSize: 1
+        peerSize: 2
+    - org1:
+        peerSize: 2
+  authorities:
+    - ca0:
+        caSize: 1

@@ -1,5 +1,5 @@
-hash: 3836e9f4b04b79cf18d3a14d194c632dcd4541839becc2a9f245e08192837e77
-updated: 2017-03-09T16:09:19.686084162+08:00
+hash: 6260e030a485f46121ea1a0b17e4675e790806efdba884d70c4760fae1164449
+updated: 2017-03-20T13:39:34.646648109+08:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -9,9 +9,8 @@ imports:
 - name: github.com/blang/semver
   version: 31b736133b98f26d5e078ec9eb591666edfd091f
 - name: github.com/coreos/etcd-operator
-  version: a7649dc4248b8a9ebf2f8a7f36db73622fb01429
+  version: 9fc1ea50dd5c69cdd5da7ed288d388d06b84b57c
   subpackages:
-  - pkg/spec
   - pkg/util/constants
   - pkg/util/retryutil
 - name: github.com/coreos/go-oidc
@@ -69,6 +68,8 @@ imports:
   - proto
 - name: github.com/google/gofuzz
   version: bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5
+- name: github.com/hyperledger/fabric
+  version: e728c5c22160620e189e85be6becb7cbf75d87dc
 - name: github.com/jonboulle/clockwork
   version: 72f9bd7c4e0c2a40055ab3d0f09654f730cce982
 - name: github.com/juju/ratelimit

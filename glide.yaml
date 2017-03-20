@@ -5,3 +5,4 @@ import:
 - package: golang.org/x/net
 - package: github.com/Sirupsen/logrus
   version: v0.11.4
+- package: github.com/hyperledger/fabric

@@ -9,17 +9,12 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/grapebaba/fabric-operator/spec"
 	"github.com/grapebaba/fabric-operator/util/k8sutil"
-	v1beta1extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
+	v1beta1extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 var (
-	supportedPVProvisioners = map[string]struct{}{
-		"kubernetes.io/gce-pd":  {},
-		"kubernetes.io/aws-ebs": {},
-	}
-
 	ErrVersionOutdated = errors.New("requested version is outdated in apiserver")
 
 	initRetryWaitTime = 30 * time.Second
@@ -38,13 +33,6 @@ type Config struct {
 }
 
 func (c *Config) Validate() error {
-	if _, ok := supportedPVProvisioners[c.PVProvisioner]; !ok {
-		return fmt.Errorf(
-			"persistent volume provisioner %s is not supported: options = %v",
-			c.PVProvisioner, supportedPVProvisioners,
-		)
-	}
-
 	return nil
 }
 
@@ -128,12 +116,7 @@ func (c *Controller) initResource() (string, error) {
 			return "", fmt.Errorf("fail to create TPR: %v", err)
 		}
 	}
-	err = k8sutil.CreateStorageClass(c.KubeCli, c.PVProvisioner)
-	if err != nil {
-		if !k8sutil.IsKubernetesResourceAlreadyExistError(err) {
-			return "", fmt.Errorf("fail to create storage class: %v", err)
-		}
-	}
+
 	return watchVersion, nil
 }
 
@@ -162,22 +145,23 @@ func (c *Controller) findAllChains() (string, error) {
 		return "", err
 	}
 
-	for i := range chainList.Items {
-		chain := chainList.Items[i]
-
-		if chain.Status.IsFailed() {
-			c.logger.Infof("ignore failed chain (%s). Please delete its TPR", chain.Metadata.Name)
-			continue
-		}
-
-		chain.Spec.Cleanup()
-
-		stopC := make(chan struct{})
-		nc := cluster.New(c.makeClusterConfig(), &chain, stopC, &c.waitCluster)
-		c.stopChMap[chain.Metadata.Name] = stopC
-		c.clusters[chain.Metadata.Name] = nc
-		c.clusterRVs[chain.Metadata.Name] = chain.Metadata.ResourceVersion
-	}
+	//TODO: Recover existing chains
+	//for i := range chainList.Items {
+	//	chain := chainList.Items[i]
+	//
+	//	if chain.Status.IsFailed() {
+	//		c.logger.Infof("ignore failed chain (%s). Please delete its TPR", chain.Metadata.Name)
+	//		continue
+	//	}
+	//
+	//	chain.Spec.Cleanup()
+	//
+	//	stopC := make(chan struct{})
+	//	nc := cluster.New(c.makeClusterConfig(), &chain, stopC, &c.waitCluster)
+	//	c.stopChMap[chain.Metadata.Name] = stopC
+	//	c.clusters[chain.Metadata.Name] = nc
+	//	c.clusterRVs[chain.Metadata.Name] = chain.Metadata.ResourceVersion
+	//}
 
 	return chainList.Metadata.ResourceVersion, nil
 }
