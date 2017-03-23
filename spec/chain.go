@@ -207,3 +207,10 @@ func (c *ChainSpec) Cleanup() {
 	}
 	c.Version = strings.TrimLeft(c.Version, "v")
 }
+
+func (cs *ChainStatus) IsFailed() bool {
+	if cs == nil {
+		return false
+	}
+	return true
+}
