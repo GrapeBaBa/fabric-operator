@@ -1,23 +1,23 @@
 package controller
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/grapebaba/fabric-operator/peer_cluster"
 	"github.com/grapebaba/fabric-operator/spec"
 	"github.com/grapebaba/fabric-operator/util/k8sutil"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 	v1beta1extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	kwatch "k8s.io/client-go/pkg/watch"
-	"encoding/json"
-	"io"
-	"sync"
-	"github.com/grapebaba/fabric-operator/chain"
-	"github.com/coreos/etcd-operator/pkg/analytics"
 )
 
 var (
@@ -31,20 +31,15 @@ var (
 	MasterHost  string
 )
 
-type Event struct {
+type PeersEvent struct {
 	Type   kwatch.EventType
-	Object *spec.Chain
+	Object *spec.PeerCluster
 }
 
 type Config struct {
 	Namespace      string
 	ServiceAccount string
-	PVProvisioner  string
 	KubeCli        kubernetes.Interface
-}
-
-func (c *Config) Validate() error {
-	return nil
 }
 
 type Controller struct {
@@ -52,12 +47,12 @@ type Controller struct {
 	Config
 
 	//// TODO: combine the three cluster map.
-	chains map[string]*chain.Chain
-	// Kubernetes resource version of the chains
-	chainRVs  map[string]string
-	stopChMap map[string]chan struct{}
+	peerClusters map[string]*peer_cluster.PeerCluster
+	// Kubernetes resource version of the peerClusters
+	peerClusterRVs map[string]string
+	stopChMap      map[string]chan struct{}
 
-	waitChain sync.WaitGroup
+	waitPeerCluster sync.WaitGroup
 }
 
 func New(cfg Config) *Controller {
@@ -65,10 +60,10 @@ func New(cfg Config) *Controller {
 	return &Controller{
 		logger: logrus.WithField("controller", "controller"),
 
-		Config:    cfg,
-		chains:    make(map[string]*chain.Chain),
-		chainRVs:  make(map[string]string),
-		stopChMap: map[string]chan struct{}{},
+		Config:         cfg,
+		peerClusters:   make(map[string]*peer_cluster.PeerCluster),
+		peerClusterRVs: make(map[string]string),
+		stopChMap:      map[string]chan struct{}{},
 	}
 }
 
@@ -98,7 +93,7 @@ func (c *Controller) Run() error {
 	//	c.waitCluster.Wait()
 	//}()
 	//
-	eventCh, errCh := c.watch(watchVersion)
+	eventCh, errCh := c.watchPeers(watchVersion)
 	//
 	go func() {
 		pt := newPanicTimer(time.Minute, "unexpected long blocking (> 1 Minute) when handling cluster event")
@@ -114,11 +109,11 @@ func (c *Controller) Run() error {
 
 func (c *Controller) initResource() (string, error) {
 	watchVersion := "0"
-	err := c.createTPR()
+	err := c.createPeersTPR()
 	if err != nil {
 		if k8sutil.IsKubernetesResourceAlreadyExistError(err) {
 			// TPR has been initialized before. We need to recover existing cluster.
-			watchVersion, err = c.findAllChains()
+			watchVersion, err = c.findAllPeerClusters()
 			if err != nil {
 				return "", err
 			}
@@ -130,10 +125,10 @@ func (c *Controller) initResource() (string, error) {
 	return watchVersion, nil
 }
 
-func (c *Controller) createTPR() error {
+func (c *Controller) createPeersTPR() error {
 	tpr := &v1beta1extensions.ThirdPartyResource{
 		ObjectMeta: v1.ObjectMeta{
-			Name: spec.TPRName(),
+			Name: spec.PeersTPRName(),
 		},
 		Versions: []v1beta1extensions.APIVersion{
 			{Name: spec.TPRVersion},
@@ -145,43 +140,43 @@ func (c *Controller) createTPR() error {
 		return err
 	}
 
-	return k8sutil.WaitChainTPRReady(c.KubeCli.CoreV1().RESTClient(), 3*time.Second, 30*time.Second, c.Namespace)
+	return k8sutil.WaitPeersTPRReady(c.KubeCli.CoreV1().RESTClient(), 3*time.Second, 30*time.Second, c.Namespace)
 }
 
-func (c *Controller) findAllChains() (string, error) {
-	c.logger.Info("finding existing chains...")
-	chainList, err := k8sutil.GetChainList(c.Config.KubeCli.CoreV1().RESTClient(), c.Config.Namespace)
+func (c *Controller) findAllPeerClusters() (string, error) {
+	c.logger.Info("finding existing peerClusters...")
+	peerClusterList, err := k8sutil.GetPeerClusterList(c.Config.KubeCli.CoreV1().RESTClient(), c.Config.Namespace)
 	if err != nil {
 		return "", err
 	}
 
-	//TODO: Recover existing chains
-	//for i := range chainList.Items {
-	//	chain := chainList.Items[i]
-	//
-	//	if chain.Status.IsFailed() {
-	//		c.logger.Infof("ignore failed chain (%s). Please delete its TPR", chain.Metadata.Name)
-	//		continue
-	//	}
-	//
-	//	chain.Spec.Cleanup()
-	//
-	//	stopC := make(chan struct{})
-	//	nc := cluster.New(c.makeClusterConfig(), &chain, stopC, &c.waitCluster)
-	//	c.stopChMap[chain.Metadata.Name] = stopC
-	//	c.clusters[chain.Metadata.Name] = nc
-	//	c.clusterRVs[chain.Metadata.Name] = chain.Metadata.ResourceVersion
-	//}
+	//TODO: Recover existing peerClusters
+	for i := range peerClusterList.Items {
+		peerCluster := peerClusterList.Items[i]
 
-	return chainList.Metadata.ResourceVersion, nil
+		if peerCluster.Status.IsFailed() {
+			c.logger.Infof("ignore failed peerCluster (%s). Please delete its TPR", peerCluster.Metadata.Name)
+			continue
+		}
+
+		peerCluster.Spec.Cleanup()
+
+		stopC := make(chan struct{})
+		nc := peer_cluster.New(c.makeClusterConfig(), &peerCluster, stopC, &c.waitPeerCluster)
+		c.stopChMap[peerCluster.Metadata.Name] = stopC
+		c.peerClusters[peerCluster.Metadata.Name] = nc
+		c.peerClusterRVs[peerCluster.Metadata.Name] = peerCluster.Metadata.ResourceVersion
+	}
+
+	return peerClusterList.Metadata.ResourceVersion, nil
 }
 
-// watch creates a go routine, and watches the chain kind resources from
+// watchPeers creates a go routine, and watches the peerClusters kind resources from
 // the given watch version. It emits events on the resources through the returned
 // event chan. Errors will be reported through the returned error chan. The go routine
 // exits on any error.
-func (c *Controller) watch(watchVersion string) (<-chan *Event, <-chan error) {
-	eventCh := make(chan *Event)
+func (c *Controller) watchPeers(watchVersion string) (<-chan *PeersEvent, <-chan error) {
+	eventCh := make(chan *PeersEvent)
 	// On unexpected error case, controller should exit
 	errCh := make(chan error, 1)
 
@@ -189,7 +184,7 @@ func (c *Controller) watch(watchVersion string) (<-chan *Event, <-chan error) {
 		defer close(eventCh)
 
 		for {
-			resp, err := k8sutil.WatchChains(MasterHost, c.Config.Namespace, KubeHttpCli, watchVersion)
+			resp, err := k8sutil.WatchPeerCluster(MasterHost, c.Config.Namespace, KubeHttpCli, watchVersion)
 			if err != nil {
 				errCh <- err
 				return
@@ -204,7 +199,7 @@ func (c *Controller) watch(watchVersion string) (<-chan *Event, <-chan error) {
 
 			decoder := json.NewDecoder(resp.Body)
 			for {
-				ev, st, err := pollEvent(decoder)
+				ev, st, err := pollPeersEvent(decoder)
 				if err != nil {
 					if err == io.EOF { // apiserver will close stream periodically
 						c.logger.Debug("apiserver closed stream")
@@ -222,7 +217,7 @@ func (c *Controller) watch(watchVersion string) (<-chan *Event, <-chan error) {
 					if st.Code == http.StatusGone {
 						// event history is outdated.
 						// if nothing has changed, we can go back to watch again.
-						clusterList, err := k8sutil.GetChainList(c.Config.KubeCli.CoreV1().RESTClient(), c.Config.Namespace)
+						clusterList, err := k8sutil.GetPeerClusterList(c.Config.KubeCli.CoreV1().RESTClient(), c.Config.Namespace)
 						if err == nil && !c.isClustersCacheStale(clusterList.Items) {
 							watchVersion = clusterList.Metadata.ResourceVersion
 							break
@@ -237,7 +232,7 @@ func (c *Controller) watch(watchVersion string) (<-chan *Event, <-chan error) {
 					c.logger.Fatalf("unexpected status response from API server: %v", st.Message)
 				}
 
-				c.logger.Debugf("chain event: %v %v", ev.Type, ev.Object.Spec)
+				c.logger.Debugf("peer_cluster event: %v %v", ev.Type, ev.Object.Spec)
 
 				watchVersion = ev.Object.Metadata.ResourceVersion
 				eventCh <- ev
@@ -250,13 +245,13 @@ func (c *Controller) watch(watchVersion string) (<-chan *Event, <-chan error) {
 	return eventCh, errCh
 }
 
-func (c *Controller) isClustersCacheStale(currentClusters []spec.Chain) bool {
-	if len(c.chainRVs) != len(currentClusters) {
+func (c *Controller) isClustersCacheStale(currentClusters []spec.PeerCluster) bool {
+	if len(c.peerClusterRVs) != len(currentClusters) {
 		return true
 	}
 
 	for _, cc := range currentClusters {
-		rv, ok := c.chainRVs[cc.Metadata.Name]
+		rv, ok := c.peerClusterRVs[cc.Metadata.Name]
 		if !ok || rv != cc.Metadata.ResourceVersion {
 			return true
 		}
@@ -265,7 +260,7 @@ func (c *Controller) isClustersCacheStale(currentClusters []spec.Chain) bool {
 	return false
 }
 
-func (c *Controller) handleClusterEvent(event *Event) {
+func (c *Controller) handleClusterEvent(event *PeersEvent) {
 	clus := event.Object
 
 	if clus.Status.IsFailed() {
@@ -278,34 +273,65 @@ func (c *Controller) handleClusterEvent(event *Event) {
 	switch event.Type {
 	case kwatch.Added:
 		stopC := make(chan struct{})
-		nc := cluster.New(c.makeClusterConfig(), clus, stopC, &c.waitCluster)
+		nc := peer_cluster.New(c.makeClusterConfig(), clus, stopC, &c.waitPeerCluster)
 
 		c.stopChMap[clus.Metadata.Name] = stopC
-		c.clusters[clus.Metadata.Name] = nc
-		c.clusterRVs[clus.Metadata.Name] = clus.Metadata.ResourceVersion
+		c.peerClusters[clus.Metadata.Name] = nc
+		c.peerClusterRVs[clus.Metadata.Name] = clus.Metadata.ResourceVersion
 
-		clustersCreated.Inc()
-		clustersTotal.Inc()
+	case kwatch.Modified:
+		if _, ok := c.peerClusters[clus.Metadata.Name]; !ok {
+			c.logger.Warningf("unsafe state. cluster was never created but we received event (%s)", event.Type)
+			return
+		}
+		//c.peerClusters[clus.Metadata.Name].Update(clus)
+		c.peerClusterRVs[clus.Metadata.Name] = clus.Metadata.ResourceVersion
 
-	//case kwatch.Modified:
-	//	if _, ok := c.clusters[clus.Metadata.Name]; !ok {
-	//		c.logger.Warningf("unsafe state. cluster was never created but we received event (%s)", event.Type)
-	//		return
-	//	}
-	//	c.clusters[clus.Metadata.Name].Update(clus)
-	//	c.clusterRVs[clus.Metadata.Name] = clus.Metadata.ResourceVersion
-	//	clustersModified.Inc()
-	//
-	//case kwatch.Deleted:
-	//	if _, ok := c.clusters[clus.Metadata.Name]; !ok {
-	//		c.logger.Warningf("unsafe state. cluster was never created but we received event (%s)", event.Type)
-	//		return
-	//	}
-	//	c.clusters[clus.Metadata.Name].Delete()
-	//	delete(c.clusters, clus.Metadata.Name)
-	//	delete(c.clusterRVs, clus.Metadata.Name)
-	//	analytics.ClusterDeleted()
-	//	clustersDeleted.Inc()
-	//	clustersTotal.Dec()
+	case kwatch.Deleted:
+		if _, ok := c.peerClusters[clus.Metadata.Name]; !ok {
+			c.logger.Warningf("unsafe state. cluster was never created but we received event (%s)", event.Type)
+			return
+		}
+		//c.peerClusters[clus.Metadata.Name].Delete()
+		delete(c.peerClusters, clus.Metadata.Name)
+		delete(c.peerClusterRVs, clus.Metadata.Name)
 	}
+}
+
+func (c *Controller) makeClusterConfig() peer_cluster.Config {
+	return peer_cluster.Config{
+		ServiceAccount: c.Config.ServiceAccount,
+
+		KubeCli: c.KubeCli,
+	}
+}
+
+func pollPeersEvent(decoder *json.Decoder) (*PeersEvent, *unversioned.Status, error) {
+	re := &rawEvent{}
+	err := decoder.Decode(re)
+	if err != nil {
+		if err == io.EOF {
+			return nil, nil, err
+		}
+		return nil, nil, fmt.Errorf("fail to decode raw event from apiserver (%v)", err)
+	}
+
+	if re.Type == kwatch.Error {
+		status := &unversioned.Status{}
+		err = json.Unmarshal(re.Object, status)
+		if err != nil {
+			return nil, nil, fmt.Errorf("fail to decode (%s) into unversioned.Status (%v)", re.Object, err)
+		}
+		return nil, status, nil
+	}
+
+	ev := &PeersEvent{
+		Type:   re.Type,
+		Object: &spec.PeerCluster{},
+	}
+	err = json.Unmarshal(re.Object, ev.Object)
+	if err != nil {
+		return nil, nil, fmt.Errorf("fail to unmarshal Chain object from data (%s): %v", re.Object, err)
+	}
+	return ev, nil, nil
 }

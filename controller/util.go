@@ -17,36 +17,6 @@ type rawEvent struct {
 	Object json.RawMessage
 }
 
-func pollEvent(decoder *json.Decoder) (*Event, *unversioned.Status, error) {
-	re := &rawEvent{}
-	err := decoder.Decode(re)
-	if err != nil {
-		if err == io.EOF {
-			return nil, nil, err
-		}
-		return nil, nil, fmt.Errorf("fail to decode raw event from apiserver (%v)", err)
-	}
-
-	if re.Type == kwatch.Error {
-		status := &unversioned.Status{}
-		err = json.Unmarshal(re.Object, status)
-		if err != nil {
-			return nil, nil, fmt.Errorf("fail to decode (%s) into unversioned.Status (%v)", re.Object, err)
-		}
-		return nil, status, nil
-	}
-
-	ev := &Event{
-		Type:   re.Type,
-		Object: &spec.Chain{},
-	}
-	err = json.Unmarshal(re.Object, ev.Object)
-	if err != nil {
-		return nil, nil, fmt.Errorf("fail to unmarshal Chain object from data (%s): %v", re.Object, err)
-	}
-	return ev, nil, nil
-}
-
 // panicTimer panics when it reaches the given duration.
 type panicTimer struct {
 	d   time.Duration

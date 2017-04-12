@@ -1,118 +1,53 @@
 package spec
 
 import (
+	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (
-	defaultVersion = "1.0.0"
+	defaultVersion = "1.0.0-alpha"
 
-	TPRKind        = "chain"
-	TPRKindPlural  = "chains"
-	TPRGroup       = "chain.grapebaba.me"
+	TPRGroup       = "fabric.hyperledger.org"
 	TPRVersion     = "v1beta1"
 	TPRDescription = "Managed hyperledger fabric"
 )
 
-func TPRName() string {
-	return fmt.Sprintf("%s.%s", TPRKind, TPRGroup)
-}
-
-type Chain struct {
-	unversioned.TypeMeta `json:",inline"`
-	Metadata v1.ObjectMeta `json:"metadata,omitempty"`
-	Spec     ChainSpec   `json:"spec"`
-	Status   ChainStatus `json:"status"`
-}
-
-type ChainSpec struct {
-	// Version is the expected version of the fabric.
-	// The fabric-operator will eventually make the fabric version
-	// equal to the expected version.
-	//
-	// The version must follow the [semver]( http://semver.org) format, for example "3.1.2".
-	// Only fabric released versions are supported
-	//
-	// If version is not set, default is "1.0.0".
-	Version string `json:"version"`
-
-	// Paused is to pause the control of the operator for the fabric.
-	Paused bool `json:"paused,omitempty"`
-
-	// Pod defines the policy to create pod for the container.
-	// This will be overridden by sub spec (e.g OrganizationSpec, AuthoritySpec)
-	Pod *PodPolicy `json:"pod,omitempty"`
-
-	// OrganizationsSpec defines the spec to create fabric organizations.
-	OrganizationsSpec OrganizationsSpec `json:"organizations_spec"`
-
-	// AuthoritiesSpec defines the spec to create the fabric cas.
-	AuthoritiesSpec AuthoritiesSpec `json:"authorities_spec"`
-}
-
-type ChainStatus struct {
-	// CurrentVersion is the current cluster version
-	CurrentVersion string `json:"currentVersion"`
-	// TargetVersion is the version the cluster upgrading to.
-	// If the cluster is not upgrading, TargetVersion is empty.
-	TargetVersion string `json:"targetVersion"`
-
-	OrgnazationsStatus OrgnazationStatus `json:"orgnazation_status"`
-
-	AuthoritiesStatus AuthoritiesStatus `json:"authorities_status"`
-}
-
-type OrganizationsSpec struct {
-	// OrganizationsSpec defines the spec to create fabric organizations.
-	Organizations []OrganizationSpec `json:"organizations"`
-}
-
-type OrganizationSpec struct {
-	// PeersSpec defines the spec to create fabric peers.
-	PeersSpec *ClusterSpec `json:"peers_spec"`
-
-	// OrderersSpec defines the spec to create fabric orderers.
-	OrderersSpec *ClusterSpec `json:"orderers_spec"`
-}
-
-type AuthoritiesSpec struct {
-	// AuthoritiesSpec defines the spec to create the fabric cas.
-	Authorities []AuthoritySpec `json:"authorities"`
-}
-
-type AuthoritySpec struct {
-	ClusterSpec
-}
-
-type ClusterSpec struct {
-	// Size is the expected size of the fabric component cluster.
-	// The fabric-operator will eventually make the size of the running
-	// members equal to the expected size.
-	Size int `json:"size"`
-
-	// Pod defines the policy to create pod for the container.
-	Pod *PodPolicy `json:"pod,omitempty"`
-}
-
-// PodPolicy defines the policy to create pod for the fabric container.
+// PodPolicy defines the policy to create pod for the member container.
 type PodPolicy struct {
 	// NodeSelector specifies a map of key-value pairs. For the pod to be eligible
 	// to run on a node, the node must have each of the indicated key-value pairs as
 	// labels.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
-	// AntiAffinity determines if the fabric-operator tries to avoid putting
-	// the members in the same cluster onto the same node.
+	// AntiAffinity determines if the etcd-operator tries to avoid putting
+	// the fabric members in the same cluster onto the same node.
 	AntiAffinity bool `json:"antiAffinity"`
 
-	// Resources is the resource requirements for the container.
+	// Resources is the resource requirements for the member container.
 	// This field cannot be updated once the cluster is created.
 	Resources v1.ResourceRequirements `json:"resources"`
+}
+
+type ClusterSpec struct {
+	// Version is the expected version of the peer cluster.
+	// The operator will eventually make the peer cluster version
+	// equal to the expected version.
+	//
+	// The version must follow the [semver]( http://semver.org) format, for example "3.1.4".
+	// Only fabric released versions are supported: https://github.com/hyperledger/fabric/releases
+	//
+	// If version is not set, latest version used.
+	Version string `json:"version"`
+
+	// Paused is to pause the control of the operator for the peer cluster.
+	Paused bool `json:"paused,omitempty"`
+
+	// Pod defines the policy to create pod for the peer container.
+	Pod *PodPolicy `json:"pod,omitempty"`
 }
 
 type ClusterPhase string
@@ -129,7 +64,7 @@ type ClusterCondition struct {
 
 	Reason string `json:"reason"`
 
-	TransitionTime time.Time `json:"transitionTime"`
+	TransitionTime string `json:"transitionTime"`
 }
 
 type ClusterConditionType string
@@ -147,34 +82,9 @@ const (
 	ClusterConditionUpgrading = "Upgrading"
 )
 
-type OrgnazationsStatus struct {
-	// All organizations status in the chain
-	Orgnazations []OrgnazationStatus `json:"orgnazations"`
-}
-
-type AuthoritiesStatus struct {
-	// All authorities status in the chain
-	Authorities []AuthorityStatus `json:"orgnazations"`
-}
-
-type OrgnazationStatus struct {
-	// Peer cluster status of this organization
-	Peers ClusterStatus `json:"peers"`
-
-	// Orderer cluster status of this organization
-	Orderers ClusterStatus `json:"orderers"`
-}
-
-type AuthorityStatus struct {
-	// CA cluster status of this authority
-	CAs ClusterStatus `json:"peers"`
-}
-
 type ClusterStatus struct {
 	// Phase is the cluster running phase
-	Phase ClusterPhase `json:"phase"`
-
-	// Reason for status
+	Phase  ClusterPhase `json:"phase"`
 	Reason string       `json:"reason"`
 
 	// ControlPuased indicates the operator pauses the control of the cluster.
@@ -185,32 +95,141 @@ type ClusterStatus struct {
 
 	// Size is the current size of the cluster
 	Size int `json:"size"`
-
-	// Members are the  members in the cluster
+	// Members are the etcd members in the cluster
 	Members MembersStatus `json:"members"`
+	// CurrentVersion is the current cluster version
+	CurrentVersion string `json:"currentVersion"`
+	// TargetVersion is the version the cluster upgrading to.
+	// If the cluster is not upgrading, TargetVersion is empty.
+	TargetVersion string `json:"targetVersion"`
 }
 
 type MembersStatus struct {
-	// Ready are the peer/orderer members that are ready to serve requests
-	// The member names are the same as the peer/orderer pod names
+	// Ready are the etcd members that are ready to serve requests
+	// The member names are the same as the etcd pod names
 	Ready []string `json:"ready,omitempty"`
-
-	// Unready are the peer/orderer members not ready to serve requests
+	// Unready are the etcd members not ready to serve requests
 	Unready []string `json:"unready,omitempty"`
 }
 
-// Cleanup cleans up user passed spec, e.g. defaulting, transforming fields.
-// TODO: move this to admission controller
-func (c *ChainSpec) Cleanup() {
-	if len(c.Version) == 0 {
-		c.Version = defaultVersion
+func (cs ClusterStatus) Copy() ClusterStatus {
+	newCS := ClusterStatus{}
+	b, err := json.Marshal(cs)
+	if err != nil {
+		panic(err)
 	}
-	c.Version = strings.TrimLeft(c.Version, "v")
+	err = json.Unmarshal(b, &newCS)
+	if err != nil {
+		panic(err)
+	}
+	return newCS
 }
 
-func (cs *ChainStatus) IsFailed() bool {
+func (cs *ClusterStatus) IsFailed() bool {
 	if cs == nil {
 		return false
 	}
-	return true
+	return cs.Phase == ClusterPhaseFailed
+}
+
+func (cs *ClusterStatus) SetPhase(p ClusterPhase) {
+	cs.Phase = p
+}
+
+func (cs *ClusterStatus) PauseControl() {
+	cs.ControlPaused = true
+}
+
+func (cs *ClusterStatus) Control() {
+	cs.ControlPaused = false
+}
+
+func (cs *ClusterStatus) UpgradeVersionTo(v string) {
+	cs.TargetVersion = v
+}
+
+func (cs *ClusterStatus) SetVersion(v string) {
+	cs.TargetVersion = ""
+	cs.CurrentVersion = v
+}
+
+func (cs *ClusterStatus) SetReason(r string) {
+	cs.Reason = r
+}
+
+func (cs *ClusterStatus) AppendScalingUpCondition(from, to int) {
+	c := ClusterCondition{
+		Type:           ClusterConditionScalingUp,
+		Reason:         scalingReason(from, to),
+		TransitionTime: time.Now().Format(time.RFC3339),
+	}
+	cs.appendCondition(c)
+}
+
+func (cs *ClusterStatus) AppendScalingDownCondition(from, to int) {
+	c := ClusterCondition{
+		Type:           ClusterConditionScalingDown,
+		Reason:         scalingReason(from, to),
+		TransitionTime: time.Now().Format(time.RFC3339),
+	}
+	cs.appendCondition(c)
+}
+
+func (cs *ClusterStatus) AppendRecoveringCondition() {
+	c := ClusterCondition{
+		Type:           ClusterConditionRecovering,
+		TransitionTime: time.Now().Format(time.RFC3339),
+	}
+	cs.appendCondition(c)
+}
+
+func (cs *ClusterStatus) AppendUpgradingCondition(to string, member string) {
+	reason := fmt.Sprintf("upgrading cluster member %s version to %v", member, to)
+
+	c := ClusterCondition{
+		Type:           ClusterConditionUpgrading,
+		Reason:         reason,
+		TransitionTime: time.Now().Format(time.RFC3339),
+	}
+	cs.appendCondition(c)
+}
+
+func (cs *ClusterStatus) AppendRemovingDeadMember(name string) {
+	reason := fmt.Sprintf("removing dead member %s", name)
+
+	c := ClusterCondition{
+		Type:           ClusterConditionRemovingDeadMember,
+		Reason:         reason,
+		TransitionTime: time.Now().Format(time.RFC3339),
+	}
+	cs.appendCondition(c)
+}
+
+func (cs *ClusterStatus) SetReadyCondition() {
+	c := ClusterCondition{
+		Type:           ClusterConditionReady,
+		TransitionTime: time.Now().Format(time.RFC3339),
+	}
+
+	if len(cs.Conditions) == 0 {
+		cs.appendCondition(c)
+		return
+	}
+
+	lastc := cs.Conditions[len(cs.Conditions)-1]
+	if lastc.Type == ClusterConditionReady {
+		return
+	}
+	cs.appendCondition(c)
+}
+
+func (cs *ClusterStatus) appendCondition(c ClusterCondition) {
+	cs.Conditions = append(cs.Conditions, c)
+	if len(cs.Conditions) > 10 {
+		cs.Conditions = cs.Conditions[1:]
+	}
+}
+
+func scalingReason(from, to int) string {
+	return fmt.Sprintf("Current cluster size: %d, desired cluster size: %d", from, to)
 }
