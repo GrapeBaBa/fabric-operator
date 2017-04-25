@@ -18,41 +18,33 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"time"
-
-	"github.com/coreos/etcd-operator/pkg/util/constants"
 	"github.com/grapebaba/fabric-operator/spec"
-	"github.com/grapebaba/fabric-operator/util/retryutil"
+	"github.com/grapebaba/fabric-operator/util/fabricutil"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
-	apierrors "k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/meta/metatypes"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/labels"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/serializer"
-	"k8s.io/client-go/pkg/util/intstr"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp" // for gcp auth
 	"k8s.io/client-go/rest"
 )
 
 const (
 	// TODO: This is constant for current purpose. We might make it configurable later.
-	etcdDir                    = "/var/etcd"
-	dataDir                    = etcdDir + "/data"
-	backupFile                 = "/var/etcd/latest.backup"
-	etcdVersionAnnotationKey   = "etcd.version"
-	annotationPrometheusScrape = "prometheus.io/scrape"
-	annotationPrometheusPort   = "prometheus.io/port"
+	peerVersionAnnotationKey = "peer.version"
 )
 
-func GetEtcdVersion(pod *v1.Pod) string {
-	return pod.Annotations[etcdVersionAnnotationKey]
+func GetPeerVersion(pod *v1.Pod) string {
+	return pod.Annotations[peerVersionAnnotationKey]
 }
 
-func SetEtcdVersion(pod *v1.Pod, version string) {
-	pod.Annotations[etcdVersionAnnotationKey] = version
+func SetPeerVersion(pod *v1.Pod, version string) {
+	pod.Annotations[peerVersionAnnotationKey] = version
 }
 
 func GetPodNames(pods []*v1.Pod) []string {
@@ -63,9 +55,8 @@ func GetPodNames(pods []*v1.Pod) []string {
 	return res
 }
 
-
-func EtcdImageName(version string) string {
-	return fmt.Sprintf("quay.io/coreos/etcd:v%v", version)
+func FabricPeerImageName(version string) string {
+	return fmt.Sprintf("hyperledger/fabric-peer:x86_64-%v", version)
 }
 
 func GetNodePortString(srv *v1.Service) string {
@@ -77,126 +68,107 @@ func PodWithNodeSelector(p *v1.Pod, ns map[string]string) *v1.Pod {
 	return p
 }
 
-func BackupServiceAddr(clusterName string) string {
-	return fmt.Sprintf("%s:%d", BackupServiceName(clusterName), constants.DefaultBackupPodHTTPPort)
-}
-
-func BackupServiceName(clusterName string) string {
-	return fmt.Sprintf("%s-backup-sidecar", clusterName)
-}
-
-func CreateMemberService(kubecli kubernetes.Interface, ns string, svc *v1.Service) (*v1.Service, error) {
-	retSvc, err := kubecli.CoreV1().Services(ns).Create(svc)
+func CreateMemberSecret(kubecli kubernetes.Interface, ns string, secret *v1.Secret) (*v1.Secret, error) {
+	retSecret, err := kubecli.CoreV1().Secrets(ns).Create(secret)
 	if err != nil {
 		return nil, err
 	}
-	return retSvc, nil
+	return retSecret, nil
 }
 
-func CreateEtcdService(kubecli kubernetes.Interface, clusterName, ns string, owner metatypes.OwnerReference) (*v1.Service, error) {
-	svc := newEtcdServiceManifest(clusterName)
+func NewPeerPod(m *fabricutil.Member, clusterName string, cs spec.PeerClusterSpec, owner metav1.OwnerReference) *v1.Pod {
+	commands := "peer node start --peer-defaultchain=false"
+
+	container := peerContainer(commands, cs.Version, m)
+	if cs.Pod != nil {
+		container = containerWithRequirements(container, cs.Pod.Resources)
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: m.Name,
+			Labels: map[string]string{
+				"app":          "peer",
+				"peer_node":    m.Name,
+				"peer_cluster": clusterName,
+			},
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			Containers:    []v1.Container{container},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{Name: "etcd-data", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+				{Name: "docker", VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/var/run"}}},
+				{Name: "secret", VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: m.SecretName}}},
+			},
+			// DNS A record: [m.Name].[clusterName].Namespace.svc.cluster.local.
+			// For example, etcd-0000 in default namesapce will have DNS name
+			// `etcd-0000.etcd.default.svc.cluster.local`.
+			Hostname:  m.Name,
+			Subdomain: clusterName,
+		},
+	}
+
+	SetPeerVersion(pod, cs.Version)
+
+	if cs.Pod != nil {
+		if cs.Pod.AntiAffinity {
+			pod = PodWithAntiAffinity(pod, clusterName)
+		}
+
+		if len(cs.Pod.NodeSelector) != 0 {
+			pod = PodWithNodeSelector(pod, cs.Pod.NodeSelector)
+		}
+	}
+	addOwnerRefToObject(pod.GetObjectMeta(), owner)
+	return pod
+}
+
+func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference) error {
+	return createService(kubecli, clusterName, clusterName, ns, v1.ClusterIPNone, owner)
+}
+
+func createService(kubecli kubernetes.Interface, svcName, clusterName, ns, clusterIP string, owner metav1.OwnerReference) error {
+	svc := newPeerClusterServiceManifest(svcName, clusterName, clusterIP)
 	addOwnerRefToObject(svc.GetObjectMeta(), owner)
-	retSvc, err := kubecli.CoreV1().Services(ns).Create(svc)
-	if err != nil {
-		return nil, err
-	}
-	return retSvc, nil
+	_, err := kubecli.CoreV1().Services(ns).Create(svc)
+	return err
 }
 
-// CreateAndWaitPod is a workaround for self hosted and util for testing.
-// We should eventually get rid of this in critical code path and move it to test util.
-func CreateAndWaitPod(kubecli kubernetes.Interface, ns string, pod *v1.Pod, timeout time.Duration) (*v1.Pod, error) {
-	_, err := kubecli.CoreV1().Pods(ns).Create(pod)
-	if err != nil {
-		return nil, err
-	}
-
-	interval := 3 * time.Second
-	var retPod *v1.Pod
-	retryutil.Retry(interval, int(timeout/(interval)), func() (bool, error) {
-		retPod, err = kubecli.CoreV1().Pods(ns).Get(pod.Name)
-		if err != nil {
-			return false, err
-		}
-		switch retPod.Status.Phase {
-		case v1.PodRunning:
-			return true, nil
-		case v1.PodPending:
-			return false, nil
-		default:
-			return false, fmt.Errorf("unexpected pod status.phase: %v", retPod.Status.Phase)
-		}
-	})
-
-	return retPod, nil
-}
-
-func newEtcdServiceManifest(clusterName string) *v1.Service {
+func newPeerClusterServiceManifest(svcName, clusterName string, clusterIP string) *v1.Service {
 	labels := map[string]string{
-		"app":          "etcd",
-		"etcd_cluster": clusterName,
+		"app":          "peer",
+		"peer_cluster": clusterName,
 	}
+
 	svc := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
-			Name:   clusterName,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   svcName,
 			Labels: labels,
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{
-					Name:       "client",
-					Port:       2379,
-					TargetPort: intstr.FromInt(2379),
+					Name:       "peer",
+					Port:       7051,
+					TargetPort: intstr.FromInt(int(7051)),
+					Protocol:   v1.ProtocolTCP,
+				},
+				{
+					Name:       "event",
+					Port:       7053,
+					TargetPort: intstr.FromInt(int(7053)),
 					Protocol:   v1.ProtocolTCP,
 				},
 			},
-			Selector: labels,
+			Selector:  labels,
+			ClusterIP: clusterIP,
 		},
 	}
 	return svc
 }
 
-// TODO: converge the port logic with member ClientAddr() and PeerAddr()
-func NewMemberServiceManifest(etcdName, clusterName string, owner metatypes.OwnerReference) *v1.Service {
-	svc := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
-			Name: etcdName,
-			Labels: map[string]string{
-				"etcd_cluster": clusterName,
-			},
-			Annotations: map[string]string{
-				annotationPrometheusScrape: "true",
-				annotationPrometheusPort:   "2379",
-			},
-		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{
-					Name:       "server",
-					Port:       2380,
-					TargetPort: intstr.FromInt(2380),
-					Protocol:   v1.ProtocolTCP,
-				},
-				{
-					Name:       "client",
-					Port:       2379,
-					TargetPort: intstr.FromInt(2379),
-					Protocol:   v1.ProtocolTCP,
-				},
-			},
-			Selector: map[string]string{
-				"app":          "etcd",
-				"etcd_node":    etcdName,
-				"etcd_cluster": clusterName,
-			},
-		},
-	}
-	addOwnerRefToObject(svc.GetObjectMeta(), owner)
-	return svc
-}
-
-
-func addOwnerRefToObject(o meta.Object, r metatypes.OwnerReference) {
+func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 	o.SetOwnerReferences(append(o.GetOwnerReferences(), r))
 }
 
@@ -210,7 +182,6 @@ func MustNewKubeClient() kubernetes.Interface {
 
 func InClusterConfig() (*rest.Config, error) {
 	// Work around https://github.com/kubernetes/kubernetes/issues/40973
-	// See https://github.com/coreos/etcd-operator/issues/731#issuecomment-283804819
 	if len(os.Getenv("KUBERNETES_SERVICE_HOST")) == 0 {
 		addrs, err := net.LookupHost("kubernetes.default.svc")
 		if err != nil {
@@ -230,7 +201,7 @@ func NewTPRClient() (*rest.RESTClient, error) {
 		return nil, err
 	}
 
-	config.GroupVersion = &unversioned.GroupVersion{
+	config.GroupVersion = &schema.GroupVersion{
 		Group:   spec.TPRGroup,
 		Version: spec.TPRVersion,
 	}
@@ -238,11 +209,11 @@ func NewTPRClient() (*rest.RESTClient, error) {
 	config.ContentType = runtime.ContentTypeJSON
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
-	restcli, err := rest.RESTClientFor(config)
+	restCli, err := rest.RESTClientFor(config)
 	if err != nil {
 		return nil, err
 	}
-	return restcli, nil
+	return restCli, nil
 }
 
 func IsKubernetesResourceAlreadyExistError(err error) bool {

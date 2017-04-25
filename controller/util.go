@@ -8,8 +8,8 @@ import (
 
 	"github.com/grapebaba/fabric-operator/spec"
 
-	"k8s.io/client-go/pkg/api/unversioned"
-	kwatch "k8s.io/client-go/pkg/watch"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kwatch "k8s.io/apimachinery/pkg/watch"
 )
 
 type rawEvent struct {

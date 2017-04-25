@@ -1,3 +1,17 @@
+// Copyright 2016 Kai Chen <281165273@qq.com> (@grapebaba)
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package controller
 
 import (
@@ -13,11 +27,10 @@ import (
 	"github.com/grapebaba/fabric-operator/peer_cluster"
 	"github.com/grapebaba/fabric-operator/spec"
 	"github.com/grapebaba/fabric-operator/util/k8sutil"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kwatch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/api/v1"
 	v1beta1extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	kwatch "k8s.io/client-go/pkg/watch"
 )
 
 var (
@@ -31,7 +44,7 @@ var (
 	MasterHost  string
 )
 
-type PeersEvent struct {
+type PeerClusterEvent struct {
 	Type   kwatch.EventType
 	Object *spec.PeerCluster
 }
@@ -58,13 +71,17 @@ type Controller struct {
 func New(cfg Config) *Controller {
 	return &Controller{Config: cfg}
 	return &Controller{
-		logger: logrus.WithField("controller", "controller"),
+		logger: logrus.WithField("pkg", "controller"),
 
 		Config:         cfg,
 		peerClusters:   make(map[string]*peer_cluster.PeerCluster),
 		peerClusterRVs: make(map[string]string),
 		stopChMap:      map[string]chan struct{}{},
 	}
+}
+
+func (c *Config) Validate() error {
+	return nil
 }
 
 func (c *Controller) Run() error {
@@ -86,14 +103,14 @@ func (c *Controller) Run() error {
 
 	c.logger.Infof("starts running from watch version: %s", watchVersion)
 
-	//defer func() {
-	//	for _, stopC := range c.stopChMap {
-	//		close(stopC)
-	//	}
-	//	c.waitCluster.Wait()
-	//}()
-	//
-	eventCh, errCh := c.watchPeers(watchVersion)
+	defer func() {
+		for _, stopC := range c.stopChMap {
+			close(stopC)
+		}
+		c.waitPeerCluster.Wait()
+	}()
+
+	eventCh, errCh := c.watchPeerClusters(watchVersion)
 	//
 	go func() {
 		pt := newPanicTimer(time.Minute, "unexpected long blocking (> 1 Minute) when handling cluster event")
@@ -109,7 +126,7 @@ func (c *Controller) Run() error {
 
 func (c *Controller) initResource() (string, error) {
 	watchVersion := "0"
-	err := c.createPeersTPR()
+	err := c.createPeerClusterTPR()
 	if err != nil {
 		if k8sutil.IsKubernetesResourceAlreadyExistError(err) {
 			// TPR has been initialized before. We need to recover existing cluster.
@@ -125,15 +142,15 @@ func (c *Controller) initResource() (string, error) {
 	return watchVersion, nil
 }
 
-func (c *Controller) createPeersTPR() error {
+func (c *Controller) createPeerClusterTPR() error {
 	tpr := &v1beta1extensions.ThirdPartyResource{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: spec.PeersTPRName(),
 		},
 		Versions: []v1beta1extensions.APIVersion{
 			{Name: spec.TPRVersion},
 		},
-		Description: spec.TPRDescription,
+		Description: spec.PeerClusterTPRDescription,
 	}
 	_, err := c.KubeCli.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
 	if err != nil {
@@ -171,12 +188,12 @@ func (c *Controller) findAllPeerClusters() (string, error) {
 	return peerClusterList.Metadata.ResourceVersion, nil
 }
 
-// watchPeers creates a go routine, and watches the peerClusters kind resources from
+// watchPeerClusters creates a go routine, and watches the peerClusters kind resources from
 // the given watch version. It emits events on the resources through the returned
 // event chan. Errors will be reported through the returned error chan. The go routine
 // exits on any error.
-func (c *Controller) watchPeers(watchVersion string) (<-chan *PeersEvent, <-chan error) {
-	eventCh := make(chan *PeersEvent)
+func (c *Controller) watchPeerClusters(watchVersion string) (<-chan *PeerClusterEvent, <-chan error) {
+	eventCh := make(chan *PeerClusterEvent)
 	// On unexpected error case, controller should exit
 	errCh := make(chan error, 1)
 
@@ -184,7 +201,7 @@ func (c *Controller) watchPeers(watchVersion string) (<-chan *PeersEvent, <-chan
 		defer close(eventCh)
 
 		for {
-			resp, err := k8sutil.WatchPeerCluster(MasterHost, c.Config.Namespace, KubeHttpCli, watchVersion)
+			resp, err := k8sutil.WatchPeerClusters(MasterHost, c.Config.Namespace, KubeHttpCli, watchVersion)
 			if err != nil {
 				errCh <- err
 				return
@@ -199,7 +216,7 @@ func (c *Controller) watchPeers(watchVersion string) (<-chan *PeersEvent, <-chan
 
 			decoder := json.NewDecoder(resp.Body)
 			for {
-				ev, st, err := pollPeersEvent(decoder)
+				ev, st, err := pollPeerClusterEvent(decoder)
 				if err != nil {
 					if err == io.EOF { // apiserver will close stream periodically
 						c.logger.Debug("apiserver closed stream")
@@ -232,7 +249,7 @@ func (c *Controller) watchPeers(watchVersion string) (<-chan *PeersEvent, <-chan
 					c.logger.Fatalf("unexpected status response from API server: %v", st.Message)
 				}
 
-				c.logger.Debugf("peer_cluster event: %v %v", ev.Type, ev.Object.Spec)
+				c.logger.Debugf("peer cluster event: %v %v", ev.Type, ev.Object.Spec)
 
 				watchVersion = ev.Object.Metadata.ResourceVersion
 				eventCh <- ev
@@ -260,7 +277,7 @@ func (c *Controller) isClustersCacheStale(currentClusters []spec.PeerCluster) bo
 	return false
 }
 
-func (c *Controller) handleClusterEvent(event *PeersEvent) {
+func (c *Controller) handleClusterEvent(event *PeerClusterEvent) {
 	clus := event.Object
 
 	if clus.Status.IsFailed() {
@@ -306,7 +323,7 @@ func (c *Controller) makeClusterConfig() peer_cluster.Config {
 	}
 }
 
-func pollPeersEvent(decoder *json.Decoder) (*PeersEvent, *unversioned.Status, error) {
+func pollPeerClusterEvent(decoder *json.Decoder) (*PeerClusterEvent, *metav1.Status, error) {
 	re := &rawEvent{}
 	err := decoder.Decode(re)
 	if err != nil {
@@ -317,7 +334,7 @@ func pollPeersEvent(decoder *json.Decoder) (*PeersEvent, *unversioned.Status, er
 	}
 
 	if re.Type == kwatch.Error {
-		status := &unversioned.Status{}
+		status := &metav1.Status{}
 		err = json.Unmarshal(re.Object, status)
 		if err != nil {
 			return nil, nil, fmt.Errorf("fail to decode (%s) into unversioned.Status (%v)", re.Object, err)
@@ -325,7 +342,7 @@ func pollPeersEvent(decoder *json.Decoder) (*PeersEvent, *unversioned.Status, er
 		return nil, status, nil
 	}
 
-	ev := &PeersEvent{
+	ev := &PeerClusterEvent{
 		Type:   re.Type,
 		Object: &spec.PeerCluster{},
 	}

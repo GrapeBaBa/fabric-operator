@@ -1,3 +1,17 @@
+// Copyright 2016 Kai Chen <281165273@qq.com> (@grapebaba)
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -15,15 +29,15 @@ import (
 	"github.com/grapebaba/fabric-operator/util/k8sutil/election/resourcelock"
 	"github.com/grapebaba/fabric-operator/util/retryutil"
 	"github.com/grapebaba/fabric-operator/version"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/tools/record"
 )
 
 var (
-	pvProvisioner string
-	namespace     string
-	name          string
+	namespace string
+	name      string
 
 	printVersion bool
 )
@@ -44,11 +58,11 @@ func init() {
 		panic(err)
 	}
 	controller.MasterHost = restCfg.Host
-	restcli, err := k8sutil.NewTPRClient()
+	restCli, err := k8sutil.NewTPRClient()
 	if err != nil {
 		panic(err)
 	}
-	controller.KubeHttpCli = restcli.Client
+	controller.KubeHttpCli = restCli.Client
 }
 
 func main() {
@@ -69,7 +83,7 @@ func main() {
 	}()
 
 	if printVersion {
-		fmt.Println("etcd-operator Version:", version.Version)
+		fmt.Println("fabric-operator Version:", version.Version)
 		fmt.Println("Git SHA:", version.GitSHA)
 		fmt.Println("Go Version:", runtime.Version())
 		fmt.Printf("Go OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH)
@@ -133,9 +147,9 @@ func run(stop <-chan struct{}) {
 }
 
 func newControllerConfig() controller.Config {
-	kubecli := k8sutil.MustNewKubeClient()
+	kubeCli := k8sutil.MustNewKubeClient()
 
-	serviceAccount, err := getMyPodServiceAccount(kubecli)
+	serviceAccount, err := getMyPodServiceAccount(kubeCli)
 	if err != nil {
 		logrus.Fatalf("fail to get my pod's service account: %v", err)
 	}
@@ -143,17 +157,16 @@ func newControllerConfig() controller.Config {
 	cfg := controller.Config{
 		Namespace:      namespace,
 		ServiceAccount: serviceAccount,
-		PVProvisioner:  pvProvisioner,
-		KubeCli:        kubecli,
+		KubeCli:        kubeCli,
 	}
 
 	return cfg
 }
 
-func getMyPodServiceAccount(kubecli kubernetes.Interface) (string, error) {
+func getMyPodServiceAccount(kubeCli kubernetes.Interface) (string, error) {
 	var sa string
 	err := retryutil.Retry(5*time.Second, 100, func() (bool, error) {
-		pod, err := kubecli.CoreV1().Pods(namespace).Get(name)
+		pod, err := kubeCli.CoreV1().Pods(namespace).Get(name, v1.GetOptions{})
 		if err != nil {
 			logrus.Errorf("fail to get operator pod (%s): %v", name, err)
 			return false, nil

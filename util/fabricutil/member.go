@@ -13,20 +13,26 @@ type Member struct {
 	Name string
 	// Kubernetes namespace this member runs in.
 	Namespace string
+
+	SecretName string
+
+	ConfigName string
+
+	OrgMSPId string
 }
 
 func (m *Member) fqdn() string {
-	return fmt.Sprintf("%s.%s.%s.svc.peer.local", m.Name, clusterNameFromMemberName(m.Name), m.Namespace)
+	return fmt.Sprintf("%s.%s.%s.svc.peercluster.local", m.Name, clusterNameFromMemberName(m.Name), m.Namespace)
 }
 
 type MemberSet map[string]*Member
 
-func NewMemberSet(ms ...*Member) MemberSet {
-	res := MemberSet{}
-	for _, m := range ms {
-		res[m.Name] = m
-	}
-	return res
+func NewMemberSet() MemberSet {
+	return MemberSet{}
+}
+
+func (m *Member) PeerAddr() string {
+	return fmt.Sprintf("http://%s:7051", m.fqdn())
 }
 
 // the set of all members of s1 that are not members of s2
@@ -111,7 +117,15 @@ func MemberNameFromPeerURL(pu string) (string, error) {
 }
 
 func CreateMemberName(clusterName string, member int) string {
-	return fmt.Sprintf("%s-%04d", clusterName, member)
+	return fmt.Sprintf("%s-peer%04d", clusterName, member)
+}
+
+func CreateMemberSecretName(clusterName string, member int) string {
+	return fmt.Sprintf("%s-secret%04d", clusterName, member)
+}
+
+func CreateMemberConfigName(clusterName string, member int) string {
+	return fmt.Sprintf("%s-config%04d", clusterName, member)
 }
 
 func clusterNameFromMemberName(mn string) string {

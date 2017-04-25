@@ -17,14 +17,14 @@ package spec
 import (
 	"fmt"
 	"strings"
-	"k8s.io/client-go/pkg/api/meta/metatypes"
-	"k8s.io/client-go/pkg/api/unversioned"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (
-	PeersTPRKind       = "peerCluster"
-	PeersTPRKindPlural = "peers"
+	PeersTPRKind              = "peerCluster"
+	PeerClusterTPRDescription = "Managed hyperledger fabric peer cluster"
 )
 
 func PeersTPRName() string {
@@ -32,17 +32,17 @@ func PeersTPRName() string {
 }
 
 type PeerCluster struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	Metadata v1.ObjectMeta `json:"metadata,omitempty"`
-	Spec     PeersClusterSpec   `json:"spec"`
+	Spec     PeerClusterSpec   `json:"spec"`
 	Status   ClusterStatus `json:"status"`
 }
 
-func (c *PeerCluster) AsOwner() metatypes.OwnerReference {
+func (c *PeerCluster) AsOwner() metav1.OwnerReference {
 	trueVar := true
 	// TODO: In 1.6 this is gonna be "k8s.io/kubernetes/pkg/apis/meta/v1"
 	// Both api.OwnerReference and metatypes.OwnerReference are combined into that.
-	return metatypes.OwnerReference{
+	return metav1.OwnerReference{
 		APIVersion: c.APIVersion,
 		Kind:       c.Kind,
 		Name:       c.Metadata.Name,
@@ -51,28 +51,36 @@ func (c *PeerCluster) AsOwner() metatypes.OwnerReference {
 	}
 }
 
+type MSPSpec struct {
+	AdminCerts map[string][]byte `json:"admin_certs"`
+
+	CACerts map[string][]byte `json:"ca_certs"`
+
+	KeyStore map[string][]byte `json:"key_store"`
+
+	SignCerts map[string][]byte `json:"sign_certs"`
+
+	IntermediateCerts map[string][]byte `json:"intermediate_certs,omitempty"`
+}
+
 type IdentitySpec struct {
-	AdminCerts map[string]string `json:"admin_certs"`
+	OrgMSPId string `json:"org_msp_id"`
 
-	CACerts map[string]string `json:"ca_certs"`
-
-	KeyStore map[string]string `json:"key_store"`
-
-	SignCerts map[string]string `json:"sign_certs"`
+	MSP *MSPSpec `json:"msp"`
 }
 
 type TLSSpec struct {
-	PeerCert string `json:"peer_cert,omitempty"`
+	PeerCert []byte `json:"peer_cert,omitempty"`
 
-	PeerKey string `json:"peer_key,omitempty"`
+	PeerKey []byte `json:"peer_key,omitempty"`
 
-	PeerRootCert string `json:"peer_root_cert,omitempty"`
+	PeerRootCert []byte `json:"peer_root_cert,omitempty"`
 
-	VMCert string `json:"vm_cert,omitempty"`
+	VMCert []byte `json:"vm_cert,omitempty"`
 
-	VMKey string `json:"vm_key,omitempty"`
+	VMKey []byte `json:"vm_key,omitempty"`
 
-	VMRootCert string `json:"vm_root_cert,omitempty"`
+	VMRootCert []byte `json:"vm_root_cert,omitempty"`
 }
 
 type PeerSpec struct {
@@ -83,12 +91,12 @@ type PeerSpec struct {
 	// Channels defines the channels of this peer own to.
 	Channels []string `json:"channels,omitempty"`
 
-	Chain string `json:"peer_cluster"`
+	Chain string `json:"chain"`
 
 	Config map[string]string `json:"config,omitempty"`
 }
 
-type PeersClusterSpec struct {
+type PeerClusterSpec struct {
 	ClusterSpec `json:",inline"`
 	// Peers defines the secure info and config for the peer cluster
 	Peers []*PeerSpec `json:"peers"`
@@ -96,9 +104,13 @@ type PeersClusterSpec struct {
 
 // Cleanup cleans up user passed spec, e.g. defaulting, transforming fields.
 // TODO: move this to admission controller
-func (c *PeersClusterSpec) Cleanup() {
+func (c *PeerClusterSpec) Cleanup() {
 	if len(c.Version) == 0 {
 		c.Version = defaultVersion
 	}
 	c.Version = strings.TrimLeft(c.Version, "v")
+}
+
+func (c *PeerClusterSpec) Validate() error {
+	return nil
 }
