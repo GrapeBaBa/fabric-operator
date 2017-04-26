@@ -1,4 +1,4 @@
-// Copyright 2016 The etcd-operator Authors
+// Copyright 2016 Kai Chen <281165273@qq.com> (@grapebaba)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package peer_cluster
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/grapebaba/fabric-operator/spec"
 	"github.com/grapebaba/fabric-operator/util/fabricutil"
 	"github.com/grapebaba/fabric-operator/util/k8sutil"
+	"github.com/grapebaba/fabric-operator/util/retryutil"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -221,57 +223,57 @@ func (c *PeerCluster) run(stopC <-chan struct{}) {
 				return
 			}
 
-		case <-time.After(reconcileInterval):
-			if c.cluster.Spec.Paused {
-				c.status.PauseControl()
-				c.logger.Infof("control is paused, skipping reconcilation")
-				continue
-			} else {
-				c.status.Control()
-			}
-
-			running, pending, err := c.pollPods()
-			if err != nil {
-				c.logger.Errorf("fail to poll pods: %v", err)
-				continue
-			}
-
-			if len(pending) > 0 {
-				// Pod startup might take long, e.g. pulling image. It would deterministically become running or succeeded/failed later.
-				c.logger.Infof("skip reconciliation: running (%v), pending (%v)", k8sutil.GetPodNames(running), k8sutil.GetPodNames(pending))
-				continue
-			}
-			if len(running) == 0 {
-				c.logger.Warningf("all etcd pods are dead. Trying to recover from a previous backup")
-				rerr = c.disasterRecovery(nil)
-				if rerr != nil {
-					c.logger.Errorf("fail to do disaster recovery: %v", rerr)
-				}
-				// On normal recovery case, we need backoff. On error case, this could be either backoff or leading to cluster delete.
-				break
-			}
-
-			// On controller restore, we could have "members == nil"
-			if rerr != nil || c.members == nil {
-				rerr = c.updateMembers(podsToMemberSet(running, c.cluster.Spec.SelfHosted))
-				if rerr != nil {
-					c.logger.Errorf("failed to update members: %v", rerr)
-					break
-				}
-			}
-			rerr = c.reconcile(running)
-			if rerr != nil {
-				c.logger.Errorf("failed to reconcile: %v", rerr)
-				break
-			}
-
-			if err := c.updateLocalBackupStatus(); err != nil {
-				c.logger.Warningf("failed to update local backup service status: %v", err)
-			}
-			c.updateMemberStatus(running)
-			if err := c.updateTPRStatus(); err != nil {
-				c.logger.Warningf("failed to update TPR status: %v", err)
-			}
+			//case <-time.After(reconcileInterval):
+			//	if c.cluster.Spec.Paused {
+			//		c.status.PauseControl()
+			//		c.logger.Infof("control is paused, skipping reconcilation")
+			//		continue
+			//	} else {
+			//		c.status.Control()
+			//	}
+			//
+			//	running, pending, err := c.pollPods()
+			//	if err != nil {
+			//		c.logger.Errorf("fail to poll pods: %v", err)
+			//		continue
+			//	}
+			//
+			//	if len(pending) > 0 {
+			//		// Pod startup might take long, e.g. pulling image. It would deterministically become running or succeeded/failed later.
+			//		c.logger.Infof("skip reconciliation: running (%v), pending (%v)", k8sutil.GetPodNames(running), k8sutil.GetPodNames(pending))
+			//		continue
+			//	}
+			//	if len(running) == 0 {
+			//		c.logger.Warningf("all etcd pods are dead. Trying to recover from a previous backup")
+			//		rerr = c.disasterRecovery(nil)
+			//		if rerr != nil {
+			//			c.logger.Errorf("fail to do disaster recovery: %v", rerr)
+			//		}
+			//		// On normal recovery case, we need backoff. On error case, this could be either backoff or leading to cluster delete.
+			//		break
+			//	}
+			//
+			//	// On controller restore, we could have "members == nil"
+			//	if rerr != nil || c.members == nil {
+			//		rerr = c.updateMembers(podsToMemberSet(running, c.cluster.Spec.SelfHosted))
+			//		if rerr != nil {
+			//			c.logger.Errorf("failed to update members: %v", rerr)
+			//			break
+			//		}
+			//	}
+			//	rerr = c.reconcile(running)
+			//	if rerr != nil {
+			//		c.logger.Errorf("failed to reconcile: %v", rerr)
+			//		break
+			//	}
+			//
+			//	if err := c.updateLocalBackupStatus(); err != nil {
+			//		c.logger.Warningf("failed to update local backup service status: %v", err)
+			//	}
+			//	c.updateMemberStatus(running)
+			//	if err := c.updateTPRStatus(); err != nil {
+			//		c.logger.Warningf("failed to update TPR status: %v", err)
+			//	}
 		}
 
 		if isFatalError(rerr) {
@@ -284,28 +286,13 @@ func (c *PeerCluster) run(stopC <-chan struct{}) {
 	}
 }
 
-//func isSpecEqual(s1, s2 spec.ClusterSpec) bool {
-//	if s1.Size != s2.Size || s1.Paused != s2.Paused || s1.Version != s2.Version {
-//		return false
-//	}
-//	return true
-//}
-//
-//func (c *PeerCluster) startSeedMember(recoverFromBackup bool) error {
-//	m := &etcdutil.Member{
-//		Name:      etcdutil.CreateMemberName(c.cluster.Metadata.Name, c.memberCounter),
-//		Namespace: c.cluster.Metadata.Namespace,
-//	}
-//	ms := etcdutil.NewMemberSet(m)
-//	if err := c.createPodAndService(ms, m, "new", recoverFromBackup); err != nil {
-//		return fmt.Errorf("failed to create seed member (%s): %v", m.Name, err)
-//	}
-//	c.memberCounter++
-//	c.members = ms
-//	c.logger.Infof("cluster created with seed member (%s)", m.Name)
-//	return nil
-//}
-//
+func isSpecEqual(s1, s2 spec.PeerClusterSpec) bool {
+	if len(s1.Peers) != len(s2.Peers) || s1.Paused != s2.Paused || s1.Version != s2.Version {
+		return false
+	}
+	return true
+}
+
 // bootstrap creates the peer members of peer cluster.
 func (c *PeerCluster) bootstrap() error {
 	ms := fabricutil.NewMemberSet()
@@ -318,42 +305,54 @@ func (c *PeerCluster) bootstrap() error {
 			OrgMSPId:   peer.Identity.OrgMSPId,
 		}
 		secretData := make(map[string][]byte)
+		keyToPaths := []v1.KeyToPath{}
 		for k, v := range peer.Identity.MSP.AdminCerts {
-			secretData["admincerts."+k] = v
+			secretData["admincerts-"+k] = v
+			keyToPaths = append(keyToPaths, v1.KeyToPath{Key: "admincerts-" + k, Path: "msp/admincerts/" + k})
 		}
 		for k, v := range peer.Identity.MSP.CACerts {
-			secretData["cacerts."+k] = v
+			secretData["cacerts-"+k] = v
+			keyToPaths = append(keyToPaths, v1.KeyToPath{Key: "cacerts-" + k, Path: "msp/cacerts/" + k})
 		}
 		for k, v := range peer.Identity.MSP.KeyStore {
-			secretData["keystore."+k] = v
+			secretData["keystore-"+k] = v
+			keyToPaths = append(keyToPaths, v1.KeyToPath{Key: "keystore-" + k, Path: "msp/keystore/" + k})
 		}
 		for k, v := range peer.Identity.MSP.SignCerts {
-			secretData["signcerts."+k] = v
+			secretData["signcerts-"+k] = v
+			keyToPaths = append(keyToPaths, v1.KeyToPath{Key: "signcerts-" + k, Path: "msp/signcerts/" + k})
 		}
 		if peer.Identity.MSP.IntermediateCerts != nil {
 			for k, v := range peer.Identity.MSP.IntermediateCerts {
-				secretData["intermediatecerts."+k] = v
+				secretData["intermediatecerts-"+k] = v
+				keyToPaths = append(keyToPaths, v1.KeyToPath{Key: "intermediatecerts-" + k, Path: "msp/intermediatecerts/" + k})
 			}
 		}
 
 		if peer.TLS != nil {
 			if peer.TLS.PeerCert != nil {
 				secretData["peercert.pem"] = peer.TLS.PeerCert
+				keyToPaths = append(keyToPaths, v1.KeyToPath{Key: "peercert.pem", Path: "tls/peercert.pem"})
 			}
 			if peer.TLS.PeerKey != nil {
 				secretData["peerkey.pem"] = peer.TLS.PeerKey
+				keyToPaths = append(keyToPaths, v1.KeyToPath{Key: "peerkey.pem", Path: "tls/peerkey.pem"})
 			}
 			if peer.TLS.PeerRootCert != nil {
 				secretData["peerrootcert.pem"] = peer.TLS.PeerRootCert
+				keyToPaths = append(keyToPaths, v1.KeyToPath{Key: "peerrootcert.pem", Path: "tls/peerrootcert.pem"})
 			}
 			if peer.TLS.VMCert != nil {
 				secretData["vmcert.pem"] = peer.TLS.VMCert
+				keyToPaths = append(keyToPaths, v1.KeyToPath{Key: "vmcert.pem", Path: "tls/vmcert.pem"})
 			}
 			if peer.TLS.VMKey != nil {
 				secretData["vmkey.pem"] = peer.TLS.VMKey
+				keyToPaths = append(keyToPaths, v1.KeyToPath{Key: "vmkey.pem", Path: "tls/vmkey.pem"})
 			}
 			if peer.TLS.VMRootCert != nil {
 				secretData["vmrootcert.pem"] = peer.TLS.VMRootCert
+				keyToPaths = append(keyToPaths, v1.KeyToPath{Key: "vmrootcert.pem", Path: "tls/vmrootcert.pem"})
 
 			}
 		}
@@ -370,7 +369,7 @@ func (c *PeerCluster) bootstrap() error {
 			return nil
 		}
 
-		err := c.createPod(m)
+		err = c.createPod(m, keyToPaths)
 		if err != nil {
 			return nil
 		}
@@ -394,21 +393,14 @@ func (c *PeerCluster) bootstrap() error {
 //	})
 //}
 //
-//func (c *PeerCluster) delete() {
-//	c.gc.CollectCluster(c.cluster.Metadata.Name, garbagecollection.NullUID)
-//
-//	if c.bm == nil {
-//		return
-//	}
-//
-//	if err := c.bm.cleanup(); err != nil {
-//		c.logger.Errorf("cluster deletion: backup manager failed to cleanup: %v", err)
-//	}
-//}
-//
+func (c *PeerCluster) delete() {
+	c.logger.Info("cluster deletion")
+}
+
 func (c *PeerCluster) setupService() error {
 	return k8sutil.CreatePeerService(c.config.KubeCli, c.cluster.Metadata.Name, c.cluster.Metadata.Namespace, c.cluster.AsOwner())
 }
+
 //
 //func (c *PeerCluster) deleteClientServiceLB() error {
 //	err := c.config.KubeCli.Core().Services(c.cluster.Metadata.Namespace).Delete(k8sutil.ClientServiceName(c.cluster.Metadata.Name), nil)
@@ -426,8 +418,8 @@ func (c *PeerCluster) setupService() error {
 //	return nil
 //}
 //
-func (c *PeerCluster) createPod(m *fabricutil.Member) error {
-	pod := k8sutil.NewPeerPod(m, c.cluster.Metadata.Name, c.cluster.Spec, c.cluster.AsOwner())
+func (c *PeerCluster) createPod(m *fabricutil.Member, k2p []v1.KeyToPath) error {
+	pod := k8sutil.NewPeerPod(m, c.cluster.Metadata.Name, c.cluster.Spec, k2p, c.cluster.AsOwner())
 
 	_, err := c.config.KubeCli.Core().Pods(c.cluster.Metadata.Namespace).Create(pod)
 	if err != nil {

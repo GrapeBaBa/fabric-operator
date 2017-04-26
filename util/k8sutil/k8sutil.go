@@ -76,7 +76,7 @@ func CreateMemberSecret(kubecli kubernetes.Interface, ns string, secret *v1.Secr
 	return retSecret, nil
 }
 
-func NewPeerPod(m *fabricutil.Member, clusterName string, cs spec.PeerClusterSpec, owner metav1.OwnerReference) *v1.Pod {
+func NewPeerPod(m *fabricutil.Member, clusterName string, cs spec.PeerClusterSpec, k2p []v1.KeyToPath, owner metav1.OwnerReference) *v1.Pod {
 	commands := "peer node start --peer-defaultchain=false"
 
 	container := peerContainer(commands, cs.Version, m)
@@ -99,7 +99,9 @@ func NewPeerPod(m *fabricutil.Member, clusterName string, cs spec.PeerClusterSpe
 			Volumes: []v1.Volume{
 				{Name: "etcd-data", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
 				{Name: "docker", VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/var/run"}}},
-				{Name: "secret", VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: m.SecretName}}},
+				{Name: "secret", VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{
+					SecretName: m.SecretName,
+					Items:      k2p}}},
 			},
 			// DNS A record: [m.Name].[clusterName].Namespace.svc.cluster.local.
 			// For example, etcd-0000 in default namesapce will have DNS name

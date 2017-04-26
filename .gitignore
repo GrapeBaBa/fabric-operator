@@ -1,3 +1,5 @@
 .idea/
 vendor/
 operator/client/
+operator/server/server
+operator/server/fabric-operator-alpine

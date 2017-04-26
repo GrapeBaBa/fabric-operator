@@ -21,6 +21,7 @@ import (
 	"github.com/grapebaba/fabric-operator/util/fabricutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/api"
 )
 
 func peerContainer(commands, version string, m *fabricutil.Member) v1.Container {
@@ -61,10 +62,10 @@ func peerContainer(commands, version string, m *fabricutil.Member) v1.Container 
 			{Name: "CORE_PEER_GOSSIP_EXTERNALENDPOINT", Value: m.PeerAddr()},
 			{Name: "CORE_PEER_GOSSIP_SKIPHANDSHAKE", Value: "true"},
 			{Name: "CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE", Value: "test"},
-			{Name: "CORE_PEER_TLS_ENABLED", Value: "true"},
-			{Name: "CORE_PEER_TLS_KEY_FILE", Value: "/etc/hyperledger/fabric/secret/tls/peerkey.pem"},
-			{Name: "CORE_PEER_TLS_CERT_FILE", Value: "/etc/hyperledger/fabric/secret/tls/peercert.pem"},
-			{Name: "CORE_PEER_TLS_ROOTCERT_FILE", Value: "/etc/hyperledger/fabric/secret/tls/peerrootcert.pem"},
+			//{Name: "CORE_PEER_TLS_ENABLED", Value: "true"},
+			//{Name: "CORE_PEER_TLS_KEY_FILE", Value: "/etc/hyperledger/fabric/secret/tls/peerkey.pem"},
+			//{Name: "CORE_PEER_TLS_CERT_FILE", Value: "/etc/hyperledger/fabric/secret/tls/peercert.pem"},
+			//{Name: "CORE_PEER_TLS_ROOTCERT_FILE", Value: "/etc/hyperledger/fabric/secret/tls/peerrootcert.pem"},
 		},
 	}
 
@@ -82,7 +83,7 @@ func PodWithAntiAffinity(pod *v1.Pod, clusterName string) *v1.Pod {
 		PodAntiAffinity: &v1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 				{
-					LabelSelector: &unversioned.LabelSelector{
+					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"peer_cluster": clusterName,
 						},
