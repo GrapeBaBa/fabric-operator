@@ -97,7 +97,7 @@ func NewPeerPod(m *fabricutil.Member, clusterName string, cs spec.PeerClusterSpe
 			Containers:    []v1.Container{container},
 			RestartPolicy: v1.RestartPolicyNever,
 			Volumes: []v1.Volume{
-				{Name: "etcd-data", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+				{Name: "data", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
 				{Name: "docker", VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/var/run"}}},
 				{Name: "secret", VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{
 					SecretName: m.SecretName,

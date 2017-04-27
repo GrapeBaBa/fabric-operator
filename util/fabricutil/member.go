@@ -46,7 +46,7 @@ func NewMemberSet() MemberSet {
 }
 
 func (m *Member) PeerAddr() string {
-	return fmt.Sprintf("http://%s:7051", m.fqdn())
+	return fmt.Sprintf("%s:7051", m.fqdn())
 }
 
 // the set of all members of s1 that are not members of s2

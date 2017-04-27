@@ -69,7 +69,6 @@ type Controller struct {
 }
 
 func New(cfg Config) *Controller {
-	return &Controller{Config: cfg}
 	return &Controller{
 		logger: logrus.WithField("pkg", "controller"),
 

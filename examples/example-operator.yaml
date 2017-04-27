@@ -12,6 +12,7 @@ spec:
       containers:
       - name: fabric-operator
         image: grapebaba/fabric-operator:latest
+        imagePullPolicy: IfNotPresent
         env:
         - name: MY_POD_NAMESPACE
           valueFrom:

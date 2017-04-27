@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	PeersTPRKind              = "peerCluster"
+	PeersTPRKind              = "peercluster"
 	PeerClusterTPRDescription = "Managed hyperledger fabric peer cluster"
 )
 

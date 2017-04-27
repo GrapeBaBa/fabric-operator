@@ -421,7 +421,7 @@ func (c *PeerCluster) setupService() error {
 func (c *PeerCluster) createPod(m *fabricutil.Member, k2p []v1.KeyToPath) error {
 	pod := k8sutil.NewPeerPod(m, c.cluster.Metadata.Name, c.cluster.Spec, k2p, c.cluster.AsOwner())
 
-	_, err := c.config.KubeCli.Core().Pods(c.cluster.Metadata.Namespace).Create(pod)
+	_, err := c.config.KubeCli.CoreV1().Pods(c.cluster.Metadata.Namespace).Create(pod)
 	if err != nil {
 		return err
 	}
@@ -501,7 +501,7 @@ func (c *PeerCluster) updateTPRStatus() error {
 
 	newCluster := c.cluster
 	newCluster.Status = c.status
-	newCluster, err := k8sutil.UpdateClusterTPRObject(c.config.KubeCli.Core().RESTClient(), c.cluster.Metadata.Namespace, newCluster)
+	newCluster, err := k8sutil.UpdateClusterTPRObject(c.config.KubeCli.CoreV1().RESTClient(), c.cluster.Metadata.Namespace, newCluster)
 	if err != nil {
 		return err
 	}

@@ -1,5 +1,5 @@
 apiVersion: "fabric.hyperledger.org/v1beta1"
-kind: "PeerCluster"
+kind: "Peercluster"
 metadata:
   name: "example-peer-cluster"
 spec:
