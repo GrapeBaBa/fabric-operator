@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"github.com/grapebaba/fabric-operator/spec"
-	"github.com/grapebaba/fabric-operator/util/fabricutil"
+	"github.com/grapebaba/fabric-operator/pkg/spec"
+	"github.com/grapebaba/fabric-operator/pkg/util/fabricutil"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -30,11 +30,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp" // for gcp auth
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
-	"net/http"
-	"time"
-	"github.com/grapebaba/fabric-operator/pkg/util/retryutil"
 )
 
 const (
@@ -230,8 +227,8 @@ func IsKubernetesResourceNotFoundError(err error) bool {
 }
 
 // We are using internal api types for cluster related.
-func ClusterListOpt(clusterName string) v1.ListOptions {
-	return v1.ListOptions{
+func ClusterListOpt(clusterName string) metav1.ListOptions {
+	return metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(newLablesForCluster(clusterName)).String(),
 	}
 }

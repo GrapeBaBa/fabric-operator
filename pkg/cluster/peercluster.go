@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package peer_cluster
+package cluster
 
 import (
 	"fmt"
@@ -22,10 +22,10 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/grapebaba/fabric-operator/spec"
-	"github.com/grapebaba/fabric-operator/util/fabricutil"
-	"github.com/grapebaba/fabric-operator/util/k8sutil"
-	"github.com/grapebaba/fabric-operator/util/retryutil"
+	"github.com/grapebaba/fabric-operator/pkg/spec"
+	"github.com/grapebaba/fabric-operator/pkg/util/fabricutil"
+	"github.com/grapebaba/fabric-operator/pkg/util/k8sutil"
+	"github.com/grapebaba/fabric-operator/pkg/util/retryutil"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -33,8 +33,8 @@ import (
 )
 
 var (
-	reconcileInterval         = 8 * time.Second
-	podTerminationGracePeriod = int64(5)
+	pcReconcileInterval         = 8 * time.Second
+	pcPodTerminationGracePeriod = int64(5)
 )
 
 type peerClusterEventType string
@@ -49,7 +49,7 @@ type peerClusterEvent struct {
 	cluster *spec.PeerCluster
 }
 
-type Config struct {
+type PeerClusterConfig struct {
 	ServiceAccount string
 
 	KubeCli kubernetes.Interface
@@ -58,12 +58,12 @@ type Config struct {
 type PeerCluster struct {
 	logger *logrus.Entry
 
-	config Config
+	config PeerClusterConfig
 
 	cluster *spec.PeerCluster
 
 	// in memory state of the cluster
-	// status is the source of truth after PeerCluster struct is materialized.
+	// status is the source of truth after OrdererService struct is materialized.
 	status        spec.ClusterStatus
 	memberCounter int
 
@@ -76,7 +76,7 @@ type PeerCluster struct {
 	members fabricutil.MemberSet
 }
 
-func New(config Config, cl *spec.PeerCluster, stopC <-chan struct{}, wg *sync.WaitGroup) *PeerCluster {
+func NewPeerCluster(config PeerClusterConfig, cl *spec.PeerCluster, stopC <-chan struct{}, wg *sync.WaitGroup) *PeerCluster {
 	lg := logrus.WithField("pkg1", "peer_cluster").WithField("peer_cluster-name", cl.Metadata.Name)
 	c := &PeerCluster{
 		logger:  lg,
@@ -167,11 +167,11 @@ func (c *PeerCluster) setupMembers() error {
 	return nil
 }
 
-//func (c *PeerCluster) Delete() {
-//	c.send(&peerClusterEvent{typ: eventDeleteCluster})
+//func (c *OrdererService) Delete() {
+//	c.send(&ordererServiceEvent{typ: eventDeleteCluster})
 //}
 //
-//func (c *PeerCluster) send(ev *peerClusterEvent) {
+//func (c *OrdererService) send(ev *ordererServiceEvent) {
 //	select {
 //	case c.eventCh <- ev:
 //		l, ecap := len(c.eventCh), cap(c.eventCh)
@@ -382,12 +382,12 @@ func (c *PeerCluster) bootstrap() error {
 
 //
 //// recover recovers the cluster by creating a seed etcd member from a backup.
-//func (c *PeerCluster) recover() error {
+//func (c *OrdererService) recover() error {
 //	return c.startSeedMember(true)
 //}
 //
-//func (c *PeerCluster) Update(cl *spec.Cluster) {
-//	c.send(&peerClusterEvent{
+//func (c *OrdererService) Update(cl *spec.Cluster) {
+//	c.send(&ordererServiceEvent{
 //		typ:     eventModifyCluster,
 //		cluster: cl,
 //	})
@@ -402,7 +402,7 @@ func (c *PeerCluster) setupService() error {
 }
 
 //
-//func (c *PeerCluster) deleteClientServiceLB() error {
+//func (c *OrdererService) deleteClientServiceLB() error {
 //	err := c.config.KubeCli.Core().Services(c.cluster.Metadata.Namespace).Delete(k8sutil.ClientServiceName(c.cluster.Metadata.Name), nil)
 //	if err != nil {
 //		if !k8sutil.IsKubernetesResourceNotFoundError(err) {
@@ -428,7 +428,7 @@ func (c *PeerCluster) createPod(m *fabricutil.Member, k2p []v1.KeyToPath) error 
 	return nil
 }
 
-//func (c *PeerCluster) removePodAndService(name string) error {
+//func (c *OrdererService) removePodAndService(name string) error {
 //	ns := c.cluster.Metadata.Namespace
 //	err := c.config.KubeCli.Core().Services(ns).Delete(name, nil)
 //	if err != nil {
@@ -447,7 +447,7 @@ func (c *PeerCluster) createPod(m *fabricutil.Member, k2p []v1.KeyToPath) error 
 //	return nil
 //}
 //
-//func (c *PeerCluster) pollPods() (running, pending []*v1.Pod, err error) {
+//func (c *OrdererService) pollPods() (running, pending []*v1.Pod, err error) {
 //	podList, err := c.config.KubeCli.Core().Pods(c.cluster.Metadata.Namespace).List(k8sutil.ClusterListOpt(c.cluster.Metadata.Name))
 //	if err != nil {
 //		return nil, nil, fmt.Errorf("failed to list running pods: %v", err)
@@ -475,7 +475,7 @@ func (c *PeerCluster) createPod(m *fabricutil.Member, k2p []v1.KeyToPath) error 
 //	return running, pending, nil
 //}
 //
-//func (c *PeerCluster) updateMemberStatus(pods []*v1.Pod) {
+//func (c *OrdererService) updateMemberStatus(pods []*v1.Pod) {
 //	var ready, unready []*v1.Pod
 //	for _, pod := range pods {
 //		// TODO: Change to URL struct for TLS integration
@@ -501,17 +501,18 @@ func (c *PeerCluster) updateTPRStatus() error {
 
 	newCluster := c.cluster
 	newCluster.Status = c.status
-	newCluster, err := k8sutil.UpdateClusterTPRObject(c.config.KubeCli.CoreV1().RESTClient(), c.cluster.Metadata.Namespace, newCluster)
+	newClusterRes, err := k8sutil.UpdateClusterTPRObject(c.config.KubeCli.CoreV1().RESTClient(), c.cluster.Metadata.Namespace, c.cluster.Metadata.Name,
+		c.cluster.Metadata.ResourceVersion, spec.TPRPeerClusterURI, newCluster, &spec.PeerCluster{})
 	if err != nil {
 		return err
 	}
 
-	c.cluster = newCluster
+	c.cluster = newClusterRes.(*spec.PeerCluster)
 
 	return nil
 }
 
-//func (c *PeerCluster) updateLocalBackupStatus() error {
+//func (c *OrdererService) updateLocalBackupStatus() error {
 //	if c.bm == nil {
 //		return nil
 //	}
@@ -540,7 +541,7 @@ func (c *PeerCluster) reportFailedStatus() {
 			return false, nil
 		}
 
-		cl, err := k8sutil.GetPeerClusterTPRObject(c.config.KubeCli.CoreV1().RESTClient(), c.cluster.Metadata.Namespace, c.cluster.Metadata.Name)
+		cl, err := k8sutil.GetTPRObject(c.config.KubeCli.CoreV1().RESTClient(), c.cluster.Metadata.Namespace, c.cluster.Metadata.Name, spec.TPRPeerClusterURI, &spec.PeerCluster{})
 		if err != nil {
 			// Update (PUT) will return conflict even if object is deleted since we have UID set in object.
 			// Because it will check UID first and return something like:
@@ -551,7 +552,7 @@ func (c *PeerCluster) reportFailedStatus() {
 			c.logger.Warningf("retry report status in %v: fail to get latest version: %v", retryInterval, err)
 			return false, nil
 		}
-		c.cluster = cl
+		c.cluster = cl.(*spec.PeerCluster)
 		return false, nil
 
 	}

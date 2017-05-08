@@ -1,18 +1,4 @@
-// Copyright 2016 Kai Chen <281165273@qq.com> (@grapebaba)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-package peer_cluster
+package peercluster
 
 import (
 	"fmt"
@@ -30,24 +16,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
+	"github.com/grapebaba/fabric-operator/pkg1/fabric"
+	"k8s.io/client-go/tools/cache"
+	"github.com/grapebaba/fabric-operator/pkg1/client/v1alpha1"
+	"k8s.io/client-go/util/workqueue"
 )
-
-var (
-	reconcileInterval         = 8 * time.Second
-	podTerminationGracePeriod = int64(5)
-)
-
-type peerClusterEventType string
-
-const (
-	eventDeleteCluster peerClusterEventType = "Delete"
-	eventModifyCluster peerClusterEventType = "Modify"
-)
-
-type peerClusterEvent struct {
-	typ     peerClusterEventType
-	cluster *spec.PeerCluster
-}
 
 type Config struct {
 	ServiceAccount string
@@ -74,6 +47,35 @@ type PeerCluster struct {
 	// the name of the member is the the name of the pod the member
 	// process runs in.
 	members fabricutil.MemberSet
+}
+
+// Operator manages lify cycle of cluster deployments
+type Operator struct {
+	kclient *kubernetes.Clientset
+	mclient *v1alpha1.FabricV1alpha1Interface
+	logger *logrus.Entry
+
+	pcInf cache.SharedIndexInformer
+	osInf cache.SharedIndexInformer
+
+	queue workqueue.RateLimitingInterface
+
+	config                 Config
+}
+
+func New(config fabric.Config) *PeerCluster{
+	return nil
+}
+
+func (c *Operator) Run(stopc <-chan struct{}) error {
+	c.pcInf=cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc:  mclient.ServiceMonitors(api.NamespaceAll).List,
+			WatchFunc: mclient.ServiceMonitors(api.NamespaceAll).Watch,
+		},
+		&v1alpha1.FabricV1alpha1Client{}, resyncPeriod, cache.Indexers{},
+	)
+	return nil
 }
 
 func New(config Config, cl *spec.PeerCluster, stopC <-chan struct{}, wg *sync.WaitGroup) *PeerCluster {

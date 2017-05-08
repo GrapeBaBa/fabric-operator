@@ -21,35 +21,33 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/coreos/fabirc-operator/pkg/util/retryutil"
 	"github.com/grapebaba/fabric-operator/pkg/spec"
+	"github.com/grapebaba/fabric-operator/pkg/util/retryutil"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
 )
 
 // TODO: replace this package with Operator client
-
-func WatchPeerClusters(host, ns string, httpClient *http.Client, resourceVersion string) (*http.Response, error) {
-	return httpClient.Get(fmt.Sprintf("%s/apis/%s/%s/namespaces/%s/peerclusters?watch=true&resourceVersion=%s",
-		host, spec.TPRGroup, spec.TPRVersion, ns, resourceVersion))
+func WatchTPR(host, ns, tpr string, httpClient *http.Client, resourceVersion string) (*http.Response, error) {
+	return httpClient.Get(fmt.Sprintf("%s/apis/%s/%s/namespaces/%s/%s?watch=true&resourceVersion=%s",
+		host, spec.TPRGroup, spec.TPRVersion, ns, tpr, resourceVersion))
 }
 
-func GetPeerClusterList(restcli rest.Interface, ns string) (*spec.PeerClusterList, error) {
-	b, err := restcli.Get().RequestURI(listPeerClustersURI(ns)).DoRaw()
+func GetTPRList(restcli rest.Interface, ns, tpr string, v interface{}) (interface{}, error) {
+	b, err := restcli.Get().RequestURI(listTPRURI(ns, tpr)).DoRaw()
 	if err != nil {
 		return nil, err
 	}
 
-	clusters := &spec.PeerClusterList{}
-	if err := json.Unmarshal(b, clusters); err != nil {
+	if err := json.Unmarshal(b, v); err != nil {
 		return nil, err
 	}
-	return clusters, nil
+	return v, nil
 }
 
-func WaitPeersTPRReady(restCli rest.Interface, interval, timeout time.Duration, ns string) error {
+func WaitTPRReady(restCli rest.Interface, interval, timeout time.Duration, ns, tpr string) error {
 	return retryutil.Retry(interval, int(timeout/interval), func() (bool, error) {
-		_, err := restCli.Get().RequestURI(listPeerClustersURI(ns)).DoRaw()
+		_, err := restCli.Get().RequestURI(listTPRURI(ns, tpr)).DoRaw()
 		if err != nil {
 			if apierrors.IsNotFound(err) { // not set up yet. wait more.
 				return false, nil
@@ -60,26 +58,26 @@ func WaitPeersTPRReady(restCli rest.Interface, interval, timeout time.Duration, 
 	})
 }
 
-func listPeerClustersURI(ns string) string {
-	return fmt.Sprintf("/apis/%s/%s/namespaces/%s/peerclusters", spec.TPRGroup, spec.TPRVersion, ns)
+func listTPRURI(ns, tpr string) string {
+	return fmt.Sprintf("/apis/%s/%s/namespaces/%s/%s", spec.TPRGroup, spec.TPRVersion, ns, tpr)
 }
 
-func GetPeerClusterTPRObject(restcli rest.Interface, ns, name string) (*spec.PeerCluster, error) {
-	uri := fmt.Sprintf("/apis/%s/%s/namespaces/%s/peers/%s", spec.TPRGroup, spec.TPRVersion, ns, name)
+func GetTPRObject(restcli rest.Interface, ns, name, tpr string, res interface{}) (interface{}, error) {
+	uri := fmt.Sprintf("/apis/%s/%s/namespaces/%s/%s/%s", spec.TPRGroup, spec.TPRVersion, ns, tpr, name)
 	b, err := restcli.Get().RequestURI(uri).DoRaw()
 	if err != nil {
 		return nil, err
 	}
-	return readOutCluster(b)
+	return readOutCluster(b, res)
 }
 
 // UpdateClusterTPRObject updates the given TPR object.
 // ResourceVersion of the object MUST be set or update will fail.
-func UpdateClusterTPRObject(restcli rest.Interface, ns string, c *spec.PeerCluster) (*spec.PeerCluster, error) {
-	if len(c.Metadata.ResourceVersion) == 0 {
+func UpdateClusterTPRObject(restcli rest.Interface, ns, name, version, tpr string, req, res interface{}) (interface{}, error) {
+	if len(version) == 0 {
 		return nil, errors.New("k8sutil: resource version is not provided")
 	}
-	return updateClusterTPRObject(restcli, ns, c)
+	return updateClusterTPRObject(restcli, ns, name, tpr, req, res)
 }
 
 // UpdateClusterTPRObjectUnconditionally updates the given TPR object.
@@ -89,17 +87,17 @@ func UpdateClusterTPRObject(restcli rest.Interface, ns string, c *spec.PeerClust
 //	return updateClusterTPRObject(restcli, ns, c)
 //}
 
-func updateClusterTPRObject(restcli rest.Interface, ns string, c *spec.PeerCluster) (*spec.PeerCluster, error) {
-	uri := fmt.Sprintf("/apis/%s/%s/namespaces/%s/peerclusters/%s", spec.TPRGroup, spec.TPRVersion, ns, c.Metadata.Name)
-	b, err := restcli.Put().RequestURI(uri).Body(c).DoRaw()
+func updateClusterTPRObject(restcli rest.Interface, ns, name, tpr string, req, res interface{}) (interface{}, error) {
+	uri := fmt.Sprintf("/apis/%s/%s/namespaces/%s/%s/%s", spec.TPRGroup, spec.TPRVersion, ns, tpr, name)
+	b, err := restcli.Put().RequestURI(uri).Body(req).DoRaw()
 	if err != nil {
 		return nil, err
 	}
-	return readOutCluster(b)
+	return readOutCluster(b, res)
 }
 
-func readOutCluster(b []byte) (*spec.PeerCluster, error) {
-	cluster := &spec.PeerCluster{}
+func readOutCluster(b []byte, v interface{}) (interface{}, error) {
+	cluster := v
 	if err := json.Unmarshal(b, cluster); err != nil {
 		return nil, err
 	}

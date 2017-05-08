@@ -8,3 +8,5 @@ import:
 - package: github.com/pborman/uuid
   version: v1.0
 - package: github.com/hyperledger/fabric
+- package: github.com/go-kit/kit/log
+- package: golang.org/x/sync/errgroup

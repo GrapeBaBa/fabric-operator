@@ -54,7 +54,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	rl "github.com/grapebaba/fabric-operator/util/k8sutil/election/resourcelock"
+	rl "github.com/grapebaba/fabric-operator/pkg/util/k8sutil/election/resourcelock"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"

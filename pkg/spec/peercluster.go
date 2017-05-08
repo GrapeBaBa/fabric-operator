@@ -15,25 +15,21 @@
 package spec
 
 import (
-	"fmt"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (
-	PeersTPRKind              = "cluster"
-	PeerClusterTPRDescription = "Managed hyperledger fabric peer cluster"
+	TPRPeerClusterKind        = "PeerCluster"
+	TPRPeerClusterURI         = "peerclusters"
+	TPRPeerClusterName        = "peer-cluster." + TPRGroup
+	TPRPeerClusterDescription = "Managed hyperledger fabric peer cluster"
 )
-
-func PeersTPRName() string {
-	return fmt.Sprintf("%s.%s", PeersTPRKind, TPRGroup)
-}
 
 type PeerCluster struct {
 	metav1.TypeMeta `json:",inline"`
-	Metadata v1.ObjectMeta `json:"metadata,omitempty"`
+	Metadata metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec     PeerClusterSpec   `json:"spec"`
 	Status   ClusterStatus `json:"status"`
 }
@@ -49,24 +45,6 @@ func (c *PeerCluster) AsOwner() metav1.OwnerReference {
 		UID:        c.Metadata.UID,
 		Controller: &trueVar,
 	}
-}
-
-type MSPSpec struct {
-	AdminCerts map[string][]byte `json:"admin_certs"`
-
-	CACerts map[string][]byte `json:"ca_certs"`
-
-	KeyStore map[string][]byte `json:"key_store"`
-
-	SignCerts map[string][]byte `json:"sign_certs"`
-
-	IntermediateCerts map[string][]byte `json:"intermediate_certs,omitempty"`
-}
-
-type IdentitySpec struct {
-	OrgMSPId string `json:"org_msp_id"`
-
-	MSP *MSPSpec `json:"msp"`
 }
 
 type TLSSpec struct {

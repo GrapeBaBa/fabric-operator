@@ -70,7 +70,7 @@ type Controller struct {
 
 func New(cfg Config) *Controller {
 	return &Controller{
-		logger: logrus.WithField("pkg", "controller"),
+		logger: logrus.WithField("pkg1", "controller"),
 
 		Config:         cfg,
 		peerClusters:   make(map[string]*peer_cluster.PeerCluster),

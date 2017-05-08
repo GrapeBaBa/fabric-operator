@@ -19,26 +19,23 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (
-	PeersTPRKind              = "cluster"
-	PeerClusterTPRDescription = "Managed hyperledger fabric peer cluster"
+	TPROrdererServiceKind        = "OrdererService"
+	TPROrdererServiceURI         = "ordererservices"
+	TPROrdererServiceName        = "orderer-service." + TPRGroup
+	TPROrdererServiceDescription = "Managed hyperledger fabric order service"
 )
 
-func PeersTPRName() string {
-	return fmt.Sprintf("%s.%s", PeersTPRKind, TPRGroup)
-}
-
-type PeerCluster struct {
+type OrdererService struct {
 	metav1.TypeMeta `json:",inline"`
-	Metadata v1.ObjectMeta `json:"metadata,omitempty"`
-	Spec     PeerClusterSpec   `json:"spec"`
+	Metadata metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec     OrdererServiceSpec   `json:"spec"`
 	Status   ClusterStatus `json:"status"`
 }
 
-func (c *PeerCluster) AsOwner() metav1.OwnerReference {
+func (c *OrdererService) AsOwner() metav1.OwnerReference {
 	trueVar := true
 	// TODO: In 1.6 this is gonna be "k8s.io/kubernetes/pkg/apis/meta/v1"
 	// Both api.OwnerReference and metatypes.OwnerReference are combined into that.
@@ -51,66 +48,29 @@ func (c *PeerCluster) AsOwner() metav1.OwnerReference {
 	}
 }
 
-type MSPSpec struct {
-	AdminCerts map[string][]byte `json:"admin_certs"`
-
-	CACerts map[string][]byte `json:"ca_certs"`
-
-	KeyStore map[string][]byte `json:"key_store"`
-
-	SignCerts map[string][]byte `json:"sign_certs"`
-
-	IntermediateCerts map[string][]byte `json:"intermediate_certs,omitempty"`
-}
-
-type IdentitySpec struct {
-	OrgMSPId string `json:"org_msp_id"`
-
-	MSP *MSPSpec `json:"msp"`
-}
-
-type TLSSpec struct {
-	PeerCert []byte `json:"peer_cert,omitempty"`
-
-	PeerKey []byte `json:"peer_key,omitempty"`
-
-	PeerRootCert []byte `json:"peer_root_cert,omitempty"`
-
-	VMCert []byte `json:"vm_cert,omitempty"`
-
-	VMKey []byte `json:"vm_key,omitempty"`
-
-	VMRootCert []byte `json:"vm_root_cert,omitempty"`
-}
-
-type PeerSpec struct {
+type OrdererSpec struct {
 	Identity *IdentitySpec `json:"identity"`
-
-	TLS *TLSSpec `json:"tls,omitempty"`
-
-	// Channels defines the channels of this peer own to.
-	Channels []string `json:"channels,omitempty"`
 
 	Chain string `json:"chain"`
 
 	Config map[string]string `json:"config,omitempty"`
 }
 
-type PeerClusterSpec struct {
+type OrdererServiceSpec struct {
 	ClusterSpec `json:",inline"`
-	// Peers defines the secure info and config for the peer cluster
-	Peers []*PeerSpec `json:"peers"`
+	// Orderers defines the secure info and config for the orderer service
+	Orderers []*OrdererSpec `json:"orderers"`
 }
 
 // Cleanup cleans up user passed spec, e.g. defaulting, transforming fields.
 // TODO: move this to admission controller
-func (c *PeerClusterSpec) Cleanup() {
+func (c *OrdererServiceSpec) Cleanup() {
 	if len(c.Version) == 0 {
 		c.Version = defaultVersion
 	}
 	c.Version = strings.TrimLeft(c.Version, "v")
 }
 
-func (c *PeerClusterSpec) Validate() error {
+func (c *OrdererServiceSpec) Validate() error {
 	return nil
 }
