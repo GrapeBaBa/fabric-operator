@@ -15,7 +15,6 @@
 package spec
 
 import (
-	"fmt"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,12 +47,22 @@ func (c *OrdererService) AsOwner() metav1.OwnerReference {
 	}
 }
 
+type GenesisMSPSpec struct {
+
+}
+
 type OrdererSpec struct {
 	Identity *IdentitySpec `json:"identity"`
 
-	Chain string `json:"chain"`
+	TLS *OrdererTLSSpec `json:"tls,omitempty"`
+
+	Profile string `json:"profile"`
+
+	Configtx string `json:"configtx"`
 
 	Config map[string]string `json:"config,omitempty"`
+
+	GenesisMSPs map[string]*MSPSpec `json:"genesis_msps"`
 }
 
 type OrdererServiceSpec struct {
@@ -73,4 +82,13 @@ func (c *OrdererServiceSpec) Cleanup() {
 
 func (c *OrdererServiceSpec) Validate() error {
 	return nil
+}
+
+type OrdererTLSSpec struct {
+	OrdererCert []byte `json:"orderer_cert,omitempty"`
+
+	OrdererKey []byte `json:"orderer_key,omitempty"`
+
+	OrdererRootCert []byte `json:"orderer_root_cert,omitempty"`
+
 }

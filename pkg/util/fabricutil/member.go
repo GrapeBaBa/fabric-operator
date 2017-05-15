@@ -49,6 +49,10 @@ func (m *Member) PeerAddr() string {
 	return fmt.Sprintf("%s:7051", m.fqdn())
 }
 
+func (m *Member) OrdererAddr() string {
+	return fmt.Sprintf("%s:7050", m.fqdn())
+}
+
 // the set of all members of s1 that are not members of s2
 func (ms MemberSet) Diff(other MemberSet) MemberSet {
 	diff := MemberSet{}
@@ -131,15 +135,15 @@ func MemberNameFromPeerURL(pu string) (string, error) {
 }
 
 func CreateMemberName(clusterName string, member int) string {
-	return fmt.Sprintf("%s-peer%04d", clusterName, member)
+	return fmt.Sprintf("%s-member-%04d", clusterName, member)
 }
 
 func CreateMemberSecretName(clusterName string, member int) string {
-	return fmt.Sprintf("%s-secret%04d", clusterName, member)
+	return fmt.Sprintf("%s-secret-%04d", clusterName, member)
 }
 
 func CreateMemberConfigName(clusterName string, member int) string {
-	return fmt.Sprintf("%s-config%04d", clusterName, member)
+	return fmt.Sprintf("%s-config-%04d", clusterName, member)
 }
 
 func clusterNameFromMemberName(mn string) string {

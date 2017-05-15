@@ -50,7 +50,7 @@ type MSPSpec struct {
 
 	CACerts map[string][]byte `json:"ca_certs"`
 
-	KeyStore map[string][]byte `json:"key_store"`
+	KeyStore map[string][]byte `json:"key_store,omitempty"`
 
 	SignCerts map[string][]byte `json:"sign_certs"`
 

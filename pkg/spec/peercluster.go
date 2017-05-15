@@ -47,7 +47,7 @@ func (c *PeerCluster) AsOwner() metav1.OwnerReference {
 	}
 }
 
-type TLSSpec struct {
+type PeerTLSSpec struct {
 	PeerCert []byte `json:"peer_cert,omitempty"`
 
 	PeerKey []byte `json:"peer_key,omitempty"`
@@ -64,7 +64,7 @@ type TLSSpec struct {
 type PeerSpec struct {
 	Identity *IdentitySpec `json:"identity"`
 
-	TLS *TLSSpec `json:"tls,omitempty"`
+	TLS *PeerTLSSpec `json:"tls,omitempty"`
 
 	// Channels defines the channels of this peer own to.
 	Channels []string `json:"channels,omitempty"`

@@ -36,7 +36,8 @@ import (
 
 const (
 	// TODO: This is constant for current purpose. We might make it configurable later.
-	peerVersionAnnotationKey = "peer.version"
+	peerVersionAnnotationKey    = "peer.version"
+	ordererVersionAnnotationKey = "orderer.version"
 )
 
 func GetPeerVersion(pod *v1.Pod) string {
@@ -45,6 +46,14 @@ func GetPeerVersion(pod *v1.Pod) string {
 
 func SetPeerVersion(pod *v1.Pod, version string) {
 	pod.Annotations[peerVersionAnnotationKey] = version
+}
+
+func GetOrdererVersion(pod *v1.Pod) string {
+	return pod.Annotations[ordererVersionAnnotationKey]
+}
+
+func SetOrdererVersion(pod *v1.Pod, version string) {
+	pod.Annotations[ordererVersionAnnotationKey] = version
 }
 
 func GetPodNames(pods []*v1.Pod) []string {
@@ -57,6 +66,10 @@ func GetPodNames(pods []*v1.Pod) []string {
 
 func FabricPeerImageName(version string) string {
 	return fmt.Sprintf("hyperledger/fabric-peer:x86_64-%v", version)
+}
+
+func FabricOrdererImageName(version string) string {
+	return fmt.Sprintf("hyperledger/fabric-orderer:x86_64-%v", version)
 }
 
 func GetNodePortString(srv *v1.Service) string {
@@ -74,6 +87,14 @@ func CreateMemberSecret(kubecli kubernetes.Interface, ns string, secret *v1.Secr
 		return nil, err
 	}
 	return retSecret, nil
+}
+
+func CreateMemberConfig(kubecli kubernetes.Interface, ns string, configMap *v1.ConfigMap) (*v1.ConfigMap, error) {
+	retConfig, err := kubecli.CoreV1().ConfigMaps(ns).Create(configMap)
+	if err != nil {
+		return nil, err
+	}
+	return retConfig, nil
 }
 
 func NewPeerPod(m *fabricutil.Member, clusterName string, cs spec.PeerClusterSpec, k2p []v1.KeyToPath, owner metav1.OwnerReference) *v1.Pod {
@@ -115,7 +136,62 @@ func NewPeerPod(m *fabricutil.Member, clusterName string, cs spec.PeerClusterSpe
 
 	if cs.Pod != nil {
 		if cs.Pod.AntiAffinity {
-			pod = PodWithAntiAffinity(pod, clusterName)
+			pod = PodWithAntiAffinity(pod, map[string]string{"peer_cluster": clusterName})
+		}
+
+		if len(cs.Pod.NodeSelector) != 0 {
+			pod = PodWithNodeSelector(pod, cs.Pod.NodeSelector)
+		}
+	}
+	addOwnerRefToObject(pod.GetObjectMeta(), owner)
+	return pod
+}
+
+func NewOrdererPod(m *fabricutil.Member, clusterName string, cs spec.OrdererServiceSpec, k2p []v1.KeyToPath, config *v1.ConfigMap, owner metav1.OwnerReference) *v1.Pod {
+	commands := "orderer"
+
+	container := ordererContainer(commands, cs.Version, m, config)
+	if cs.Pod != nil {
+		container = containerWithRequirements(container, cs.Pod.Resources)
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: m.Name,
+			Labels: map[string]string{
+				"app":             "orderer",
+				"orderer_node":    m.Name,
+				"orderer_service": clusterName,
+			},
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			Containers:    []v1.Container{container},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{Name: "data", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+				{Name: "secret", VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{
+					SecretName: m.SecretName,
+					Items:      k2p}}},
+				{Name: "config", VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{Name: config.Name},
+					Items: []v1.KeyToPath{
+						{Key: "configtx.yaml", Path: "configtx.yaml"},
+					},
+				}}},
+			},
+			// DNS A record: [m.Name].[clusterName].Namespace.svc.cluster.local.
+			// For example, etcd-0000 in default namesapce will have DNS name
+			// `etcd-0000.etcd.default.svc.cluster.local`.
+			Hostname:  m.Name,
+			Subdomain: clusterName,
+		},
+	}
+
+	SetOrdererVersion(pod, cs.Version)
+
+	if cs.Pod != nil {
+		if cs.Pod.AntiAffinity {
+			pod = PodWithAntiAffinity(pod, map[string]string{"orderer_service": clusterName})
 		}
 
 		if len(cs.Pod.NodeSelector) != 0 {
@@ -127,11 +203,16 @@ func NewPeerPod(m *fabricutil.Member, clusterName string, cs spec.PeerClusterSpe
 }
 
 func CreatePeerService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference) error {
-	return createService(kubecli, clusterName, clusterName, ns, v1.ClusterIPNone, owner)
+	svc := newPeerClusterServiceManifest(clusterName, clusterName, v1.ClusterIPNone)
+	return createService(kubecli, ns, owner, svc)
 }
 
-func createService(kubecli kubernetes.Interface, svcName, clusterName, ns, clusterIP string, owner metav1.OwnerReference) error {
-	svc := newPeerClusterServiceManifest(svcName, clusterName, clusterIP)
+func CreateOrdererService(kubecli kubernetes.Interface, clusterName, ns string, owner metav1.OwnerReference) error {
+	svc := newOrdererServiceServiceManifest(clusterName, clusterName, v1.ClusterIPNone)
+	return createService(kubecli, ns, owner, svc)
+}
+
+func createService(kubecli kubernetes.Interface, ns string, owner metav1.OwnerReference, svc *v1.Service) error {
 	addOwnerRefToObject(svc.GetObjectMeta(), owner)
 	_, err := kubecli.CoreV1().Services(ns).Create(svc)
 	return err
@@ -160,6 +241,33 @@ func newPeerClusterServiceManifest(svcName, clusterName string, clusterIP string
 					Name:       "event",
 					Port:       7053,
 					TargetPort: intstr.FromInt(int(7053)),
+					Protocol:   v1.ProtocolTCP,
+				},
+			},
+			Selector:  labels,
+			ClusterIP: clusterIP,
+		},
+	}
+	return svc
+}
+
+func newOrdererServiceServiceManifest(svcName, clusterName string, clusterIP string) *v1.Service {
+	labels := map[string]string{
+		"app":             "orderer",
+		"orderer_service": clusterName,
+	}
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   svcName,
+			Labels: labels,
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:       "orderer",
+					Port:       7050,
+					TargetPort: intstr.FromInt(int(7051)),
 					Protocol:   v1.ProtocolTCP,
 				},
 			},

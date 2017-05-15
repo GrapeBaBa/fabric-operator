@@ -1,0 +1,236 @@
+apiVersion: "fabric.hyperledger.org/v1beta1"
+kind: "OrdererService"
+metadata:
+  name: "example-orderer-service"
+spec:
+  version: "1.0.0-alpha"
+  orderers:
+    - identity:
+        org_msp_id: OrdererMSP
+
+        msp:
+          admin_certs:
+            admin.example.com-cert.pem: |
+              LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNIekNDQWNXZ0F3SUJBZ0lRYkF5WUVlUU9IU3VjMEZKV1hkRGFkakFLQmdncWhrak9QUVFEQWpCcE1Rc3cKQ1FZRFZRUUdFd0pWVXpFVE1CRUdBMVVFQ0JNS1EyRnNhV1p2Y201cFlURVdNQlFHQTFVRUJ4TU5VMkZ1SUVaeQpZVzVqYVhOamJ6RVVNQklHQTFVRUNoTUxaWGhoYlhCc1pTNWpiMjB4RnpBVkJnTlZCQU1URG1OaExtVjRZVzF3CmJHVXVZMjl0TUI0WERURTNNRFV3T1RBek16Z3hNMW9YRFRJM01EVXdOekF6TXpneE0xb3dWakVMTUFrR0ExVUUKQmhNQ1ZWTXhFekFSQmdOVkJBZ1RDa05oYkdsbWIzSnVhV0V4RmpBVUJnTlZCQWNURFZOaGJpQkdjbUZ1WTJsegpZMjh4R2pBWUJnTlZCQU1NRVVGa2JXbHVRR1Y0WVcxd2JHVXVZMjl0TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJCnpqMERBUWNEUWdBRUxNeTI1UVpySFV4WlppeWh4eGNCU1hYZkdxSDNyeEd6Y0VwZnlBZ0dSM3lpUks3Vk1FWk0KYUV1NDFSMDBld0tsY2tNKzJSVE1YanRXbVpxR2YrQklzYU5pTUdBd0RnWURWUjBQQVFIL0JBUURBZ1dnTUJNRwpBMVVkSlFRTU1Bb0dDQ3NHQVFVRkJ3TUJNQXdHQTFVZEV3RUIvd1FDTUFBd0t3WURWUjBqQkNRd0lvQWdsbjRrCk0wZWFFY3VMeXk5QkEyVXcvVHRnS0lqTUtQTnYxeWV1NnpNdlFGRXdDZ1lJS29aSXpqMEVBd0lEU0FBd1JRSWgKQUtwbXpxSk1MQ3pzaXM5SUxoWnlENHdxVDVJSHlveEVJZ2dhUGhOWVdRQy9BaUE3ZWhLN3hLTlZxbG1YemN6cQpSc0Q3Q1hWcWRRZzBjODhYbVZpZERUWWVDUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+          ca_certs:
+            ca.example.com-cert.pem: |
+              LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNPVENDQWVDZ0F3SUJBZ0lSQUxCQ3VyVmQwaUFVUlNJQyswMHplVVF3Q2dZSUtvWkl6ajBFQXdJd2FURUwKTUFrR0ExVUVCaE1DVlZNeEV6QVJCZ05WQkFnVENrTmhiR2xtYjNKdWFXRXhGakFVQmdOVkJBY1REVk5oYmlCRwpjbUZ1WTJselkyOHhGREFTQmdOVkJBb1RDMlY0WVcxd2JHVXVZMjl0TVJjd0ZRWURWUVFERXc1allTNWxlR0Z0CmNHeGxMbU52YlRBZUZ3MHhOekExTURrd016TTRNVE5hRncweU56QTFNRGN3TXpNNE1UTmFNR2t4Q3pBSkJnTlYKQkFZVEFsVlRNUk13RVFZRFZRUUlFd3BEWVd4cFptOXlibWxoTVJZd0ZBWURWUVFIRXcxVFlXNGdSbkpoYm1OcApjMk52TVJRd0VnWURWUVFLRXd0bGVHRnRjR3hsTG1OdmJURVhNQlVHQTFVRUF4TU9ZMkV1WlhoaGJYQnNaUzVqCmIyMHdXVEFUQmdjcWhrak9QUUlCQmdncWhrak9QUU1CQndOQ0FBUzd2T1FBSDc4VjVLQm13ZFdnQWJWYm1OSzYKZmxvRndyMVJvdWEyQ2xRS0xkbnpGclFYUVBsRmhPWGwvK21ZdzdwUzUzY21Wa2l5MjlWbng4ZnFyblNUbzJrdwpaekFPQmdOVkhROEJBZjhFQkFNQ0FhWXdHUVlEVlIwbEJCSXdFQVlFVlIwbEFBWUlLd1lCQlFVSEF3RXdEd1lEClZSMFRBUUgvQkFVd0F3RUIvekFwQmdOVkhRNEVJZ1FnbG40a00wZWFFY3VMeXk5QkEyVXcvVHRnS0lqTUtQTnYKMXlldTZ6TXZRRkV3Q2dZSUtvWkl6ajBFQXdJRFJ3QXdSQUlnUFl1KzNZeWdGRXJVd092ZXVYZGJiVXQ3NTNTcAptR0hlajR3VE5PcDRWRmtDSUc1QUh0K0xCMzZyMFNQdjJoWjhGRXdqeG5NMWlLY2dZZStyK1llQnhCQ2IKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+          key_store:
+            orderer-key0.pem: |
+              LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JR0hBZ0VBTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEJHMHdhd0lCQVFRZ21uRE5nRjRrWEVmeFZLcnAKMzhPVWM2QllmTEp5blVlQXdsRk5IQlpQOUwraFJBTkNBQVNnQWh3c0FGK25oUENITitleGpCWG45eWpHVTlJWgpoVUlYNzU2bUxna0dIbnd0aFRtRHVKRkpsM0MvQzcveDJLbkF1VkdVdjJEVUZCVGFqTy9GWkZFYgotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0tCg==
+            orderer-key1.pem: |
+              LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JR0hBZ0VBTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEJHMHdhd0lCQVFRZytmYXpPNTRXMjMzeFdSVHkKdzNVMHJqempTR2c1V0Q3UlNRVU9FQkZpQkRTaFJBTkNBQVNnMlRtcXIraFBYK3ZDRTMzaGMvWXFGN2p3RjhFYQorZ0pMQ2R6aGREbk43c0s5QkoxQVh2akNnTm9WenZITUxKRFVkMEFremV4bHUrNjBDbHA4bG1vSQotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0tCg==
+          sign_certs:
+            orderer.example.com-cert.pem: |
+              LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNURENDQWZPZ0F3SUJBZ0lSQUxsUzF2TThTdUp1MEZhNFZOZUdnZzB3Q2dZSUtvWkl6ajBFQXdJd2FURUwKTUFrR0ExVUVCaE1DVlZNeEV6QVJCZ05WQkFnVENrTmhiR2xtYjNKdWFXRXhGakFVQmdOVkJBY1REVk5oYmlCRwpjbUZ1WTJselkyOHhGREFTQmdOVkJBb1RDMlY0WVcxd2JHVXVZMjl0TVJjd0ZRWURWUVFERXc1allTNWxlR0Z0CmNHeGxMbU52YlRBZUZ3MHhOekExTURrd016TTRNVE5hRncweU56QTFNRGN3TXpNNE1UTmFNRmd4Q3pBSkJnTlYKQkFZVEFsVlRNUk13RVFZRFZRUUlFd3BEWVd4cFptOXlibWxoTVJZd0ZBWURWUVFIRXcxVFlXNGdSbkpoYm1OcApjMk52TVJ3d0dnWURWUVFERXhOdmNtUmxjbVZ5TG1WNFlXMXdiR1V1WTI5dE1Ga3dFd1lIS29aSXpqMENBUVlJCktvWkl6ajBEQVFjRFFnQUVvTms1cXEvb1QxL3J3aE45NFhQMktoZTQ4QmZCR3ZvQ1N3bmM0WFE1emU3Q3ZRU2QKUUY3NHdvRGFGYzd4ekN5UTFIZEFKTTNzWmJ2dXRBcGFmSlpxQ0tPQmpEQ0JpVEFPQmdOVkhROEJBZjhFQkFNQwpCYUF3RXdZRFZSMGxCQXd3Q2dZSUt3WUJCUVVIQXdFd0RBWURWUjBUQVFIL0JBSXdBREFyQmdOVkhTTUVKREFpCmdDQ1dmaVF6UjVvUnk0dkxMMEVEWlREOU8yQW9pTXdvODIvWEo2N3JNeTlBVVRBbkJnTlZIUkVFSURBZWdoTnYKY21SbGNtVnlMbVY0WVcxd2JHVXVZMjl0Z2dkdmNtUmxjbVZ5TUFvR0NDcUdTTTQ5QkFNQ0EwY0FNRVFDSUhaTwpoc3IwWTE0YjZydEUza2RwYVQ3RWI3ZVduU1kyWVovUTlxZWl6b1FsQWlCOG5lSWlvR0o4b0lsM1dnM0djOGQ2CnNURXZoSU9XVEdpRS9ValBrcXhJMUE9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+
+      genesis_msps:
+         OrdererOrg:
+          admin_certs:
+            admin.example.com-cert.pem: |
+              LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNIekNDQWNXZ0F3SUJBZ0lRYkF5WUVlUU9IU3VjMEZKV1hkRGFkakFLQmdncWhrak9QUVFEQWpCcE1Rc3cKQ1FZRFZRUUdFd0pWVXpFVE1CRUdBMVVFQ0JNS1EyRnNhV1p2Y201cFlURVdNQlFHQTFVRUJ4TU5VMkZ1SUVaeQpZVzVqYVhOamJ6RVVNQklHQTFVRUNoTUxaWGhoYlhCc1pTNWpiMjB4RnpBVkJnTlZCQU1URG1OaExtVjRZVzF3CmJHVXVZMjl0TUI0WERURTNNRFV3T1RBek16Z3hNMW9YRFRJM01EVXdOekF6TXpneE0xb3dWakVMTUFrR0ExVUUKQmhNQ1ZWTXhFekFSQmdOVkJBZ1RDa05oYkdsbWIzSnVhV0V4RmpBVUJnTlZCQWNURFZOaGJpQkdjbUZ1WTJsegpZMjh4R2pBWUJnTlZCQU1NRVVGa2JXbHVRR1Y0WVcxd2JHVXVZMjl0TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJCnpqMERBUWNEUWdBRUxNeTI1UVpySFV4WlppeWh4eGNCU1hYZkdxSDNyeEd6Y0VwZnlBZ0dSM3lpUks3Vk1FWk0KYUV1NDFSMDBld0tsY2tNKzJSVE1YanRXbVpxR2YrQklzYU5pTUdBd0RnWURWUjBQQVFIL0JBUURBZ1dnTUJNRwpBMVVkSlFRTU1Bb0dDQ3NHQVFVRkJ3TUJNQXdHQTFVZEV3RUIvd1FDTUFBd0t3WURWUjBqQkNRd0lvQWdsbjRrCk0wZWFFY3VMeXk5QkEyVXcvVHRnS0lqTUtQTnYxeWV1NnpNdlFGRXdDZ1lJS29aSXpqMEVBd0lEU0FBd1JRSWgKQUtwbXpxSk1MQ3pzaXM5SUxoWnlENHdxVDVJSHlveEVJZ2dhUGhOWVdRQy9BaUE3ZWhLN3hLTlZxbG1YemN6cQpSc0Q3Q1hWcWRRZzBjODhYbVZpZERUWWVDUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+          ca_certs:
+            ca.example.com-cert.pem: |
+              LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNPVENDQWVDZ0F3SUJBZ0lSQUxCQ3VyVmQwaUFVUlNJQyswMHplVVF3Q2dZSUtvWkl6ajBFQXdJd2FURUwKTUFrR0ExVUVCaE1DVlZNeEV6QVJCZ05WQkFnVENrTmhiR2xtYjNKdWFXRXhGakFVQmdOVkJBY1REVk5oYmlCRwpjbUZ1WTJselkyOHhGREFTQmdOVkJBb1RDMlY0WVcxd2JHVXVZMjl0TVJjd0ZRWURWUVFERXc1allTNWxlR0Z0CmNHeGxMbU52YlRBZUZ3MHhOekExTURrd016TTRNVE5hRncweU56QTFNRGN3TXpNNE1UTmFNR2t4Q3pBSkJnTlYKQkFZVEFsVlRNUk13RVFZRFZRUUlFd3BEWVd4cFptOXlibWxoTVJZd0ZBWURWUVFIRXcxVFlXNGdSbkpoYm1OcApjMk52TVJRd0VnWURWUVFLRXd0bGVHRnRjR3hsTG1OdmJURVhNQlVHQTFVRUF4TU9ZMkV1WlhoaGJYQnNaUzVqCmIyMHdXVEFUQmdjcWhrak9QUUlCQmdncWhrak9QUU1CQndOQ0FBUzd2T1FBSDc4VjVLQm13ZFdnQWJWYm1OSzYKZmxvRndyMVJvdWEyQ2xRS0xkbnpGclFYUVBsRmhPWGwvK21ZdzdwUzUzY21Wa2l5MjlWbng4ZnFyblNUbzJrdwpaekFPQmdOVkhROEJBZjhFQkFNQ0FhWXdHUVlEVlIwbEJCSXdFQVlFVlIwbEFBWUlLd1lCQlFVSEF3RXdEd1lEClZSMFRBUUgvQkFVd0F3RUIvekFwQmdOVkhRNEVJZ1FnbG40a00wZWFFY3VMeXk5QkEyVXcvVHRnS0lqTUtQTnYKMXlldTZ6TXZRRkV3Q2dZSUtvWkl6ajBFQXdJRFJ3QXdSQUlnUFl1KzNZeWdGRXJVd092ZXVYZGJiVXQ3NTNTcAptR0hlajR3VE5PcDRWRmtDSUc1QUh0K0xCMzZyMFNQdjJoWjhGRXdqeG5NMWlLY2dZZStyK1llQnhCQ2IKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+          sign_certs:
+            ca.example.com-cert.pem: |
+              LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNPVENDQWVDZ0F3SUJBZ0lSQUxCQ3VyVmQwaUFVUlNJQyswMHplVVF3Q2dZSUtvWkl6ajBFQXdJd2FURUwKTUFrR0ExVUVCaE1DVlZNeEV6QVJCZ05WQkFnVENrTmhiR2xtYjNKdWFXRXhGakFVQmdOVkJBY1REVk5oYmlCRwpjbUZ1WTJselkyOHhGREFTQmdOVkJBb1RDMlY0WVcxd2JHVXVZMjl0TVJjd0ZRWURWUVFERXc1allTNWxlR0Z0CmNHeGxMbU52YlRBZUZ3MHhOekExTURrd016TTRNVE5hRncweU56QTFNRGN3TXpNNE1UTmFNR2t4Q3pBSkJnTlYKQkFZVEFsVlRNUk13RVFZRFZRUUlFd3BEWVd4cFptOXlibWxoTVJZd0ZBWURWUVFIRXcxVFlXNGdSbkpoYm1OcApjMk52TVJRd0VnWURWUVFLRXd0bGVHRnRjR3hsTG1OdmJURVhNQlVHQTFVRUF4TU9ZMkV1WlhoaGJYQnNaUzVqCmIyMHdXVEFUQmdjcWhrak9QUUlCQmdncWhrak9QUU1CQndOQ0FBUzd2T1FBSDc4VjVLQm13ZFdnQWJWYm1OSzYKZmxvRndyMVJvdWEyQ2xRS0xkbnpGclFYUVBsRmhPWGwvK21ZdzdwUzUzY21Wa2l5MjlWbng4ZnFyblNUbzJrdwpaekFPQmdOVkhROEJBZjhFQkFNQ0FhWXdHUVlEVlIwbEJCSXdFQVlFVlIwbEFBWUlLd1lCQlFVSEF3RXdEd1lEClZSMFRBUUgvQkFVd0F3RUIvekFwQmdOVkhRNEVJZ1FnbG40a00wZWFFY3VMeXk5QkEyVXcvVHRnS0lqTUtQTnYKMXlldTZ6TXZRRkV3Q2dZSUtvWkl6ajBFQXdJRFJ3QXdSQUlnUFl1KzNZeWdGRXJVd092ZXVYZGJiVXQ3NTNTcAptR0hlajR3VE5PcDRWRmtDSUc1QUh0K0xCMzZyMFNQdjJoWjhGRXdqeG5NMWlLY2dZZStyK1llQnhCQ2IKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+         PeerOrg1:
+          admin_certs:
+            admin.org1.example.com-cert.pem: |
+              LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNMakNDQWRTZ0F3SUJBZ0lRSERIMzdGUzMvMHAxaXNLeWN4aStpekFLQmdncWhrak9QUVFEQWpCek1Rc3cKQ1FZRFZRUUdFd0pWVXpFVE1CRUdBMVVFQ0JNS1EyRnNhV1p2Y201cFlURVdNQlFHQTFVRUJ4TU5VMkZ1SUVaeQpZVzVqYVhOamJ6RVpNQmNHQTFVRUNoTVFiM0puTVM1bGVHRnRjR3hsTG1OdmJURWNNQm9HQTFVRUF4TVRZMkV1CmIzSm5NUzVsZUdGdGNHeGxMbU52YlRBZUZ3MHhOekExTURrd016TTRNVE5hRncweU56QTFNRGN3TXpNNE1UTmEKTUZzeEN6QUpCZ05WQkFZVEFsVlRNUk13RVFZRFZRUUlFd3BEWVd4cFptOXlibWxoTVJZd0ZBWURWUVFIRXcxVApZVzRnUm5KaGJtTnBjMk52TVI4d0hRWURWUVFEREJaQlpHMXBia0J2Y21jeExtVjRZVzF3YkdVdVkyOXRNRmt3CkV3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFMytnSVVFZ3QzZjEydHU4Wm0yb3FSanZlU0Y1aTJWWVIKUUltNTlIL3BzSDdpY0dGYkNJMVRsczdlQkpqdDBzMHJyYXlmeEdxcUdEalVYdE1jYkUwQXE2TmlNR0F3RGdZRApWUjBQQVFIL0JBUURBZ1dnTUJNR0ExVWRKUVFNTUFvR0NDc0dBUVVGQndNQk1Bd0dBMVVkRXdFQi93UUNNQUF3Ckt3WURWUjBqQkNRd0lvQWdsWnBhdGtzNDhETEdXd085TklneVMzcHBMSGVQNURqdjdXOXdMMWI4SU5vd0NnWUkKS29aSXpqMEVBd0lEU0FBd1JRSWhBTVpKWWxiNkRZOFdKaGgvSTBvd3hONTBDL21WVHhycEZsdUZNSHVhR1EvcwpBaUFTbnUwdFREczZkZnFSWDdtc1I5MG5pSnRLVTZlK21DK0dLdk5KL2czdU9BPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+          ca_certs:
+            ca.org1.example.com-cert.pem: |
+              LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNUVENDQWZTZ0F3SUJBZ0lSQUw2aUU4UUtXTHJTQXpTcXlNVTZkYWt3Q2dZSUtvWkl6ajBFQXdJd2N6RUwKTUFrR0ExVUVCaE1DVlZNeEV6QVJCZ05WQkFnVENrTmhiR2xtYjNKdWFXRXhGakFVQmdOVkJBY1REVk5oYmlCRwpjbUZ1WTJselkyOHhHVEFYQmdOVkJBb1RFRzl5WnpFdVpYaGhiWEJzWlM1amIyMHhIREFhQmdOVkJBTVRFMk5oCkxtOXlaekV1WlhoaGJYQnNaUzVqYjIwd0hoY05NVGN3TlRBNU1ETXpPREV6V2hjTk1qY3dOVEEzTURNek9ERXoKV2pCek1Rc3dDUVlEVlFRR0V3SlZVekVUTUJFR0ExVUVDQk1LUTJGc2FXWnZjbTVwWVRFV01CUUdBMVVFQnhNTgpVMkZ1SUVaeVlXNWphWE5qYnpFWk1CY0dBMVVFQ2hNUWIzSm5NUzVsZUdGdGNHeGxMbU52YlRFY01Cb0dBMVVFCkF4TVRZMkV1YjNKbk1TNWxlR0Z0Y0d4bExtTnZiVEJaTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEEwSUEKQkIraFRtcUlJRE1IbWVnNzNIMDhtcElCSjdFUEliV2VpMVJmTjBVS0tPMGIzZmhGTFlqZUZaTEM2cjVhRmJVMwovOE44bTZEQWg2ZjhKMHJBbjFVaEpUS2phVEJuTUE0R0ExVWREd0VCL3dRRUF3SUJwakFaQmdOVkhTVUVFakFRCkJnUlZIU1VBQmdnckJnRUZCUWNEQVRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUNrR0ExVWREZ1FpQkNDVm1scTIKU3pqd01zWmJBNzAwaURKTGVta3NkNC9rT08vdGIzQXZWdndnMmpBS0JnZ3Foa2pPUFFRREFnTkhBREJFQWlBTwo4YlUxQU1XN2ZJbi9TNUNNTldUY1AvQVVVK1hrTmFhR1A2Z3hkdmtvSkFJZ0xlc3BkOXhLUW5kOVhhZTlTenpuCndtYXBlYUdWenpMSERYNzZ2QlZQUkdZPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+          sign_certs:
+            ca.example.com-cert.pem: |
+              LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNUVENDQWZTZ0F3SUJBZ0lSQUw2aUU4UUtXTHJTQXpTcXlNVTZkYWt3Q2dZSUtvWkl6ajBFQXdJd2N6RUwKTUFrR0ExVUVCaE1DVlZNeEV6QVJCZ05WQkFnVENrTmhiR2xtYjNKdWFXRXhGakFVQmdOVkJBY1REVk5oYmlCRwpjbUZ1WTJselkyOHhHVEFYQmdOVkJBb1RFRzl5WnpFdVpYaGhiWEJzWlM1amIyMHhIREFhQmdOVkJBTVRFMk5oCkxtOXlaekV1WlhoaGJYQnNaUzVqYjIwd0hoY05NVGN3TlRBNU1ETXpPREV6V2hjTk1qY3dOVEEzTURNek9ERXoKV2pCek1Rc3dDUVlEVlFRR0V3SlZVekVUTUJFR0ExVUVDQk1LUTJGc2FXWnZjbTVwWVRFV01CUUdBMVVFQnhNTgpVMkZ1SUVaeVlXNWphWE5qYnpFWk1CY0dBMVVFQ2hNUWIzSm5NUzVsZUdGdGNHeGxMbU52YlRFY01Cb0dBMVVFCkF4TVRZMkV1YjNKbk1TNWxlR0Z0Y0d4bExtTnZiVEJaTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEEwSUEKQkIraFRtcUlJRE1IbWVnNzNIMDhtcElCSjdFUEliV2VpMVJmTjBVS0tPMGIzZmhGTFlqZUZaTEM2cjVhRmJVMwovOE44bTZEQWg2ZjhKMHJBbjFVaEpUS2phVEJuTUE0R0ExVWREd0VCL3dRRUF3SUJwakFaQmdOVkhTVUVFakFRCkJnUlZIU1VBQmdnckJnRUZCUWNEQVRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUNrR0ExVWREZ1FpQkNDVm1scTIKU3pqd01zWmJBNzAwaURKTGVta3NkNC9rT08vdGIzQXZWdndnMmpBS0JnZ3Foa2pPUFFRREFnTkhBREJFQWlBTwo4YlUxQU1XN2ZJbi9TNUNNTldUY1AvQVVVK1hrTmFhR1A2Z3hkdmtvSkFJZ0xlc3BkOXhLUW5kOVhhZTlTenpuCndtYXBlYUdWenpMSERYNzZ2QlZQUkdZPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+         PeerOrg2:
+          admin_certs:
+            admin.org2.example.com-cert.pem: |
+              LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNMakNDQWRXZ0F3SUJBZ0lSQU9QSzlyVCtta3lCL1ZaeEt0KzRSY3d3Q2dZSUtvWkl6ajBFQXdJd2N6RUwKTUFrR0ExVUVCaE1DVlZNeEV6QVJCZ05WQkFnVENrTmhiR2xtYjNKdWFXRXhGakFVQmdOVkJBY1REVk5oYmlCRwpjbUZ1WTJselkyOHhHVEFYQmdOVkJBb1RFRzl5WnpJdVpYaGhiWEJzWlM1amIyMHhIREFhQmdOVkJBTVRFMk5oCkxtOXlaekl1WlhoaGJYQnNaUzVqYjIwd0hoY05NVGN3TlRBNU1ETXpPREV6V2hjTk1qY3dOVEEzTURNek9ERXoKV2pCYk1Rc3dDUVlEVlFRR0V3SlZVekVUTUJFR0ExVUVDQk1LUTJGc2FXWnZjbTVwWVRFV01CUUdBMVVFQnhNTgpVMkZ1SUVaeVlXNWphWE5qYnpFZk1CMEdBMVVFQXd3V1FXUnRhVzVBYjNKbk1pNWxlR0Z0Y0d4bExtTnZiVEJaCk1CTUdCeXFHU000OUFnRUdDQ3FHU000OUF3RUhBMElBQkcydUloVGRLQTB0ZHpMVm9XcjFPZXphdWJuL0hSNUsKQTN3cCtNcHA2eTNJN3ppMFZDL0FBSzVqREwrRnNmTmtBcDlQSUJvaHNISXgzSEVuTElSQ2hXS2pZakJnTUE0RwpBMVVkRHdFQi93UUVBd0lGb0RBVEJnTlZIU1VFRERBS0JnZ3JCZ0VGQlFjREFUQU1CZ05WSFJNQkFmOEVBakFBCk1Dc0dBMVVkSXdRa01DS0FJQlEyeXRIUzY4S2NWM1FOWXYyL2h5U1RHUS80TGh6VWdMQ0UvRVJQNjAzS01Bb0cKQ0NxR1NNNDlCQU1DQTBjQU1FUUNJRkFtYUV4U28xWjQ4N3VIcHUwMUdlRzRKaXV3cWF4UjVSb1crTXRaOWxoSgpBaUIwM2QyT1JsNlFXT3R6RDVDNm9MZndMR3RqZ1hERWFYQ3F1TCtvUmhsYU1BPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+          ca_certs:
+            ca.org2.example.com-cert.pem: |
+              LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNUVENDQWZTZ0F3SUJBZ0lSQUtVUEM1bENIVUVvMVZ4NmNwRmtTQ0V3Q2dZSUtvWkl6ajBFQXdJd2N6RUwKTUFrR0ExVUVCaE1DVlZNeEV6QVJCZ05WQkFnVENrTmhiR2xtYjNKdWFXRXhGakFVQmdOVkJBY1REVk5oYmlCRwpjbUZ1WTJselkyOHhHVEFYQmdOVkJBb1RFRzl5WnpJdVpYaGhiWEJzWlM1amIyMHhIREFhQmdOVkJBTVRFMk5oCkxtOXlaekl1WlhoaGJYQnNaUzVqYjIwd0hoY05NVGN3TlRBNU1ETXpPREV6V2hjTk1qY3dOVEEzTURNek9ERXoKV2pCek1Rc3dDUVlEVlFRR0V3SlZVekVUTUJFR0ExVUVDQk1LUTJGc2FXWnZjbTVwWVRFV01CUUdBMVVFQnhNTgpVMkZ1SUVaeVlXNWphWE5qYnpFWk1CY0dBMVVFQ2hNUWIzSm5NaTVsZUdGdGNHeGxMbU52YlRFY01Cb0dBMVVFCkF4TVRZMkV1YjNKbk1pNWxlR0Z0Y0d4bExtTnZiVEJaTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEEwSUEKQk5hZUNpTS9ZNVVqVTRZcm4rV2w4V3EyNXVjUTN6em5XZWJOUkkrUnVTWnA3V05qUHBxQkk5cUdURjgyMlIyQQpnV29VTDBDWm8vL2tEM29QWWpQcjNZR2phVEJuTUE0R0ExVWREd0VCL3dRRUF3SUJwakFaQmdOVkhTVUVFakFRCkJnUlZIU1VBQmdnckJnRUZCUWNEQVRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUNrR0ExVWREZ1FpQkNBVU5zclIKMHV2Q25GZDBEV0w5djRja2t4a1ArQzRjMUlDd2hQeEVUK3ROeWpBS0JnZ3Foa2pPUFFRREFnTkhBREJFQWlCSApXWEdCN3pIeE5RQXZaa3g2QXl0ajRSdGg2MkNHeXZjS1k0L2VjTTVuN0FJZ0JHakp6NEF4bUZRdGkyQkxaekdKClhzQXBsVzQyQjVjeGJLcVRoYTlTRGwwPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+          sign_certs:
+            ca.example.com-cert.pem: |
+              LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNUVENDQWZTZ0F3SUJBZ0lSQUtVUEM1bENIVUVvMVZ4NmNwRmtTQ0V3Q2dZSUtvWkl6ajBFQXdJd2N6RUwKTUFrR0ExVUVCaE1DVlZNeEV6QVJCZ05WQkFnVENrTmhiR2xtYjNKdWFXRXhGakFVQmdOVkJBY1REVk5oYmlCRwpjbUZ1WTJselkyOHhHVEFYQmdOVkJBb1RFRzl5WnpJdVpYaGhiWEJzWlM1amIyMHhIREFhQmdOVkJBTVRFMk5oCkxtOXlaekl1WlhoaGJYQnNaUzVqYjIwd0hoY05NVGN3TlRBNU1ETXpPREV6V2hjTk1qY3dOVEEzTURNek9ERXoKV2pCek1Rc3dDUVlEVlFRR0V3SlZVekVUTUJFR0ExVUVDQk1LUTJGc2FXWnZjbTVwWVRFV01CUUdBMVVFQnhNTgpVMkZ1SUVaeVlXNWphWE5qYnpFWk1CY0dBMVVFQ2hNUWIzSm5NaTVsZUdGdGNHeGxMbU52YlRFY01Cb0dBMVVFCkF4TVRZMkV1YjNKbk1pNWxlR0Z0Y0d4bExtTnZiVEJaTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEEwSUEKQk5hZUNpTS9ZNVVqVTRZcm4rV2w4V3EyNXVjUTN6em5XZWJOUkkrUnVTWnA3V05qUHBxQkk5cUdURjgyMlIyQQpnV29VTDBDWm8vL2tEM29QWWpQcjNZR2phVEJuTUE0R0ExVWREd0VCL3dRRUF3SUJwakFaQmdOVkhTVUVFakFRCkJnUlZIU1VBQmdnckJnRUZCUWNEQVRBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUNrR0ExVWREZ1FpQkNBVU5zclIKMHV2Q25GZDBEV0w5djRja2t4a1ArQzRjMUlDd2hQeEVUK3ROeWpBS0JnZ3Foa2pPUFFRREFnTkhBREJFQWlCSApXWEdCN3pIeE5RQXZaa3g2QXl0ajRSdGg2MkNHeXZjS1k0L2VjTTVuN0FJZ0JHakp6NEF4bUZRdGkyQkxaekdKClhzQXBsVzQyQjVjeGJLcVRoYTlTRGwwPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+
+      profile: TwoOrgs
+
+      configtx: |
+        ---
+        ################################################################################
+        #
+        #   Profile
+        #
+        #   - Different configuration profiles may be encoded here to be specified
+        #   as parameters to the configtxgen tool
+        #
+        ################################################################################
+        Profiles:
+
+            TwoOrgs:
+                Orderer:
+                    <<: *OrdererDefaults
+                    Organizations:
+                        - *OrdererOrg
+                Application:
+                    <<: *ApplicationDefaults
+                    Organizations:
+                        - *Org1
+                        - *Org2
+
+        ################################################################################
+        #
+        #   Section: Organizations
+        #
+        #   - This section defines the different organizational identities which will
+        #   be referenced later in the configuration.
+        #
+        ################################################################################
+        Organizations:
+
+            # SampleOrg defines an MSP using the sampleconfig.  It should never be used
+            # in production but may be used as a template for other definitions
+            - &OrdererOrg
+                # DefaultOrg defines the organization which is used in the sampleconfig
+                # of the fabric.git development environment
+                Name: OrdererOrg
+
+                # ID to load the MSP definition as
+                ID: OrdererMSP
+
+                # MSPDir is the filesystem path which contains the MSP configuration
+                MSPDir: /etc/hyperledger/fabric/secret/genesis/OrdererOrg/msp
+
+                # BCCSP (Blockchain crypto provider): Select which crypto implementation or
+                # library to use
+                BCCSP:
+                    Default: SW
+                    SW:
+                        Hash: SHA2
+                        Security: 256
+                        # Location of Key Store. If this is unset, a location will
+                        # be chosen using 'MSPDir'/keystore
+                        FileKeyStore:
+                            KeyStore:
+
+            - &Org1
+                # DefaultOrg defines the organization which is used in the sampleconfig
+                # of the fabric.git development environment
+                Name: Org1MSP
+
+                # ID to load the MSP definition as
+                ID: Org1MSP
+
+                MSPDir: /etc/hyperledger/fabric/secret/genesis/PeerOrg1/msp
+
+                # BCCSP (Blockchain crypto provider): Select which crypto implementation or
+                # library to use
+                BCCSP:
+                    Default: SW
+                    SW:
+                        Hash: SHA2
+                        Security: 256
+                        # Location of Key Store. If this is unset, a location will
+                        # be chosen using 'MSPDir'/keystore
+                        FileKeyStore:
+                            KeyStore:
+
+                AnchorPeers:
+                    # AnchorPeers defines the location of peers which can be used
+                    # for cross org gossip communication.  Note, this value is only
+                    # encoded in the genesis block in the Application section context
+                    - Host: example-peer-cluster-member-0000.example-peer-cluster.default.svc.cluster.local
+                      Port: 7051
+
+            - &Org2
+                # DefaultOrg defines the organization which is used in the sampleconfig
+                # of the fabric.git development environment
+                Name: Org2MSP
+
+                # ID to load the MSP definition as
+                ID: Org2MSP
+
+                MSPDir: /etc/hyperledger/fabric/secret/genesis/PeerOrg2/msp
+
+                # BCCSP (Blockchain crypto provider): Select which crypto implementation or
+                # library to use
+                BCCSP:
+                    Default: SW
+                    SW:
+                        Hash: SHA2
+                        Security: 256
+                        # Location of Key Store. If this is unset, a location will
+                        # be chosen using 'MSPDir'/keystore
+                        FileKeyStore:
+                            KeyStore:
+
+                AnchorPeers:
+                    # AnchorPeers defines the location of peers which can be used
+                    # for cross org gossip communication.  Note, this value is only
+                    # encoded in the genesis block in the Application section context
+                    - Host: example-peer-cluster-member-0001.example-peer-cluster.default.svc.cluster.local
+                      Port: 7051
+
+        ################################################################################
+        #
+        #   SECTION: Orderer
+        #
+        #   - This section defines the values to encode into a config transaction or
+        #   genesis block for orderer related parameters
+        #
+        ################################################################################
+        Orderer: &OrdererDefaults
+
+            # Orderer Type: The orderer implementation to start
+            # Available types are "solo" and "kafka"
+            OrdererType: solo
+
+            Addresses:
+                - example-orderer-service-member-0000.example-orderer-service.default.svc.cluster.local:7050
+
+            # Batch Timeout: The amount of time to wait before creating a batch
+            BatchTimeout: 2s
+
+            # Batch Size: Controls the number of messages batched into a block
+            BatchSize:
+
+                # Max Message Count: The maximum number of messages to permit in a batch
+                MaxMessageCount: 10
+
+                # Absolute Max Bytes: The absolute maximum number of bytes allowed for
+                # the serialized messages in a batch.
+                AbsoluteMaxBytes: 99 MB
+
+                # Preferred Max Bytes: The preferred maximum number of bytes allowed for
+                # the serialized messages in a batch. A message larger than the preferred
+                # max bytes will result in a batch larger than preferred max bytes.
+                PreferredMaxBytes: 512 KB
+
+            Kafka:
+                # Brokers: A list of Kafka brokers to which the orderer connects
+                # NOTE: Use IP:port notation
+                Brokers:
+                    - 127.0.0.1:9092
+
+            # Organizations is the list of orgs which are defined as participants on
+            # the orderer side of the network
+            Organizations:
+
+        ################################################################################
+        #
+        #   SECTION: Application
+        #
+        #   - This section defines the values to encode into a config transaction or
+        #   genesis block for application related parameters
+        #
+        ################################################################################
+        Application: &ApplicationDefaults
+
+            # Organizations is the list of orgs which are defined as participants on
+            # the application side of the network
+            Organizations:
+
+

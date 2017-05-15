@@ -77,7 +77,7 @@ type PeerCluster struct {
 }
 
 func NewPeerCluster(config PeerClusterConfig, cl *spec.PeerCluster, stopC <-chan struct{}, wg *sync.WaitGroup) *PeerCluster {
-	lg := logrus.WithField("pkg1", "peer_cluster").WithField("peer_cluster-name", cl.Metadata.Name)
+	lg := logrus.WithField("pkg", "peer-cluster").WithField("peer-cluster-name", cl.Metadata.Name)
 	c := &PeerCluster{
 		logger:  lg,
 		config:  config,

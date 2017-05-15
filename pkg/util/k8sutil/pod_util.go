@@ -28,10 +28,9 @@ func peerContainer(commands, version string, m *fabricutil.Member) v1.Container 
 	c := v1.Container{
 		// TODO: fix "sleep 5".
 		// Without waiting some time, there is highly probable flakes in network setup.
-		Command:    []string{"/bin/sh", "-c", fmt.Sprintf("sleep 5; %s", commands)},
-		Name:       "fabric-peer",
-		Image:      FabricPeerImageName(version),
-		WorkingDir: "/opt/gopath/src/github.com/hyperledger/fabric",
+		Command: []string{"/bin/sh", "-c", fmt.Sprintf("sleep 5; %s", commands)},
+		Name:    "fabric-peer",
+		Image:   FabricPeerImageName(version),
 		Ports: []v1.ContainerPort{
 			{
 				Name:          "peer",
@@ -73,21 +72,72 @@ func peerContainer(commands, version string, m *fabricutil.Member) v1.Container 
 	return c
 }
 
+func ordererContainer(commands, version string, m *fabricutil.Member, config *v1.ConfigMap) v1.Container {
+	c := v1.Container{
+		// TODO: fix "sleep 5".
+		// Without waiting some time, there is highly probable flakes in network setup.
+		Command: []string{"/bin/sh", "-c", fmt.Sprintf("sleep 5; env; %s", commands)},
+		Name:    "fabric-orderer",
+		Image:   FabricOrdererImageName(version),
+		Ports: []v1.ContainerPort{
+			{
+				Name:          "orderer",
+				ContainerPort: int32(7050),
+				Protocol:      v1.ProtocolTCP,
+			},
+
+		},
+		VolumeMounts: []v1.VolumeMount{
+			{Name: "secret", MountPath: "/etc/hyperledger/fabric/secret"},
+			{Name: "config", MountPath: "/etc/hyperledger/fabric/configtx.yaml", SubPath: "configtx.yaml"},
+			{Name: "data", MountPath: "/var/hyperledger/production"},
+		},
+		Env: []v1.EnvVar{
+			{Name: "ORDERER_GENERAL_LOGLEVEL", Value: "DEBUG"},
+			{Name: "ORDERER_GENERAL_LISTENADDRESS", Value: "0.0.0.0"},
+			{Name: "ORDERER_GENERAL_LOCALMSPID", Value: m.OrgMSPId},
+			{Name: "ORDERER_GENERAL_LOCALMSPDIR", Value: "/etc/hyperledger/fabric/secret/msp"},
+			//{Name: "ORDERER_GENERAL_GENESISPROFILE", Value: "TwoOrgs"},
+			{Name: "ORDERER_GENERAL_GENESISPROFILE", ValueFrom: &v1.EnvVarSource{
+				ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: config.Name,
+					},
+					Key: "ORDERER_GENERAL_GENESISPROFILE",
+				},
+			}},
+			//{Name: "ORDERER_GENERAL_TLS_ENABLED", Value: "true"},
+			//{Name: "ORDERER_GENERAL_TLS_PRIVATEKEY", Value: "/etc/hyperledger/fabric/secret/tls/ordererkey.pem"},
+			//{Name: "ORDERER_GENERAL_TLS_CERTIFICATE", Value: "/etc/hyperledger/fabric/secret/tls/orderercert.pem"},
+			//{Name: "ORDERER_GENERAL_TLS_ROOTCAS", Value: "[/etc/hyperledger/fabric/secret/tls/ordererrootcert.pem]"},
+		},
+
+		EnvFrom: []v1.EnvFromSource{
+			{
+				ConfigMapRef: &v1.ConfigMapEnvSource{
+					LocalObjectReference: v1.LocalObjectReference{Name: config.Name},
+				},
+			},
+		},
+		ImagePullPolicy: v1.PullIfNotPresent,
+	}
+
+	return c
+}
+
 func containerWithRequirements(c v1.Container, r v1.ResourceRequirements) v1.Container {
 	c.Resources = r
 	return c
 }
 
-func PodWithAntiAffinity(pod *v1.Pod, clusterName string) *v1.Pod {
+func PodWithAntiAffinity(pod *v1.Pod, labels map[string]string) *v1.Pod {
 	// set pod anti-affinity with the pods that belongs to the same peer cluster
 	affinity := v1.Affinity{
 		PodAntiAffinity: &v1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 				{
 					LabelSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"peer_cluster": clusterName,
-						},
+						MatchLabels: labels,
 					},
 					TopologyKey: "kubernetes.io/hostname",
 				},

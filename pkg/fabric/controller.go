@@ -94,9 +94,9 @@ func (c *Config) Validate() error {
 
 func (c *Controller) Run() error {
 	var (
-		peerClusterWatchVersion string
+		peerClusterWatchVersion    string
 		ordererServiceWatchVersion string
-		err                     error
+		err                        error
 	)
 
 	for {
@@ -190,7 +190,6 @@ func (c *Controller) initOrdererServiceResource() (string, error) {
 
 	return watchVersion, nil
 }
-
 
 func (c *Controller) createPeerClusterTPR() error {
 	tpr := &v1beta1extensions.ThirdPartyResource{
@@ -286,7 +285,6 @@ func (c *Controller) findAllOrdererServices() (string, error) {
 	return ordererServiceList.Metadata.ResourceVersion, nil
 }
 
-
 // watchPeerClusterTPR creates a go routine, and watches the peerClusters kind resources from
 // the given watch version. It emits events on the resources through the returned
 // event chan. Errors will be reported through the returned error chan. The go routine
@@ -347,7 +345,7 @@ func (c *Controller) watchPeerClusterTPR(watchVersion string, eventCh chan<- *Cl
 					c.logger.Fatalf("unexpected status response from API server: %v", st.Message)
 				}
 
-				peerCluster := ev.Object.(&spec.PeerCluster)
+				peerCluster := ev.Object.(*spec.PeerCluster)
 				c.logger.Debugf("peer cluster event: %v %v", ev.Type, peerCluster.Spec)
 
 				watchVersion = peerCluster.Metadata.ResourceVersion
@@ -420,7 +418,7 @@ func (c *Controller) watchOrdererServiceTPR(watchVersion string, eventCh chan<- 
 					c.logger.Fatalf("unexpected status response from API server: %v", st.Message)
 				}
 
-				ordererService := ev.Object.(&spec.OrdererService{})
+				ordererService := ev.Object.(*spec.OrdererService)
 				c.logger.Debugf("peer cluster event: %v %v", ev.Type, ordererService.Spec)
 
 				watchVersion = ordererService.Metadata.ResourceVersion
@@ -468,7 +466,7 @@ func (c *Controller) handleClusterEvent(event *ClusterEvent) {
 
 	switch clus.(type) {
 	case *spec.PeerCluster:
-		peerCluster := clus.(&spec.PeerCluster)
+		peerCluster := clus.(*spec.PeerCluster)
 		if peerCluster.Status.IsFailed() {
 			c.logger.Infof("ignore failed cluster (%s). Please delete its TPR", peerCluster.Metadata.Name)
 			return
@@ -503,7 +501,7 @@ func (c *Controller) handleClusterEvent(event *ClusterEvent) {
 			delete(c.peerClusterRVs, peerCluster.Metadata.Name)
 		}
 	case *spec.OrdererService:
-		ordererService := clus.(&spec.OrdererService)
+		ordererService := clus.(*spec.OrdererService)
 		if ordererService.Status.IsFailed() {
 			c.logger.Infof("ignore failed cluster (%s). Please delete its TPR", ordererService.Metadata.Name)
 			return
@@ -514,10 +512,10 @@ func (c *Controller) handleClusterEvent(event *ClusterEvent) {
 		switch event.Type {
 		case kwatch.Added:
 			stopC := make(chan struct{})
-			//nc := cluster.NewPeerCluster(c.makeOrdererServiceConfig(), ordererService, stopC, &c.waitPeerCluster)
+			nc := cluster.NewOrdererService(c.makeOrdererServiceConfig(), ordererService, stopC, &c.waitOrdererService)
 
 			c.stopOSChMap[ordererService.Metadata.Name] = stopC
-			c.ordererServices[ordererService.Metadata.Name] = nil
+			c.ordererServices[ordererService.Metadata.Name] = nc
 			c.ordererServiceRVs[ordererService.Metadata.Name] = ordererService.Metadata.ResourceVersion
 
 		case kwatch.Modified:
@@ -537,6 +535,9 @@ func (c *Controller) handleClusterEvent(event *ClusterEvent) {
 			delete(c.ordererServices, ordererService.Metadata.Name)
 			delete(c.ordererServiceRVs, ordererService.Metadata.Name)
 		}
+	default:
+		c.logger.Error("unsupported cluster event object")
+		return
 	}
 
 }
